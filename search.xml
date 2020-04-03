@@ -20,7 +20,7 @@
       
         <tags>
             
-            <tag> 基础 </tag>
+            <tag> Vue ui框架 </tag>
             
         </tags>
       
@@ -45,7 +45,9 @@
       
         <tags>
             
-            <tag> 基础 </tag>
+            <tag> vue基础 </tag>
+            
+            <tag> axios </tag>
             
         </tags>
       
@@ -70,7 +72,7 @@
       
         <tags>
             
-            <tag> 进阶 </tag>
+            <tag> webpack打包 </tag>
             
         </tags>
       
@@ -95,7 +97,7 @@
       
         <tags>
             
-            <tag> 中级 </tag>
+            <tag> vue基础 </tag>
             
         </tags>
       
@@ -120,7 +122,7 @@
       
         <tags>
             
-            <tag> 基础 </tag>
+            <tag> vue基础vuex </tag>
             
         </tags>
       
@@ -145,7 +147,7 @@
       
         <tags>
             
-            <tag> 基础 </tag>
+            <tag> vue进阶 </tag>
             
         </tags>
       
@@ -170,7 +172,9 @@
       
         <tags>
             
-            <tag> 基础 </tag>
+            <tag> es6基础 </tag>
+            
+            <tag> JavaScript </tag>
             
         </tags>
       
@@ -195,7 +199,7 @@
       
         <tags>
             
-            <tag> 基础 </tag>
+            <tag> vue进阶 </tag>
             
         </tags>
       
@@ -220,7 +224,7 @@
       
         <tags>
             
-            <tag> 基础 </tag>
+            <tag> vue基础 </tag>
             
         </tags>
       
@@ -245,7 +249,7 @@
       
         <tags>
             
-            <tag> 基础 </tag>
+            <tag> vue基础 </tag>
             
         </tags>
       
