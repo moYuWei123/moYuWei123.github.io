@@ -29,7 +29,7 @@
 
     <script src="/libs/jquery/jquery.min.js"></script>
     
-<meta name="generator" content="Hexo 4.2.0"></head>
+<meta name="generator" content="Hexo 4.2.0"><link rel="stylesheet" href="/css/prism-tomorrow.css" type="text/css"></head>
 
 
 <body>
@@ -401,6 +401,11 @@
                 
 
                 
+                <div class="info-break-policy">
+                    <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
+                    2.1k
+                </div>
+                
 
                 
 
@@ -421,9 +426,20 @@
 <h2 id="webpack简介"><a href="#webpack简介" class="headerlink" title="webpack简介"></a>webpack简介</h2><p>webpack可以很好的解决上面的问题<br><a href=""https://www.webpackjs.com/"" title="webpack官网">webpack官网</a><br>webpack 是一个现代 JavaScript 应用程序的静态模块打包器(module bundler)。当 webpack 处理应用程序时，它会递归地构建一个依赖关系图(dependency graph)，其中包含应用程序需要的每个模块，然后将所有这些模块打包成一个或多个 bundle。<br>我们熟悉的<code>vue-cli</code>内置了<code>webpack</code>,可以把单文件组件打包成<code>html</code><br><img src="./imgs/img1.jpg" alt="webpack图解"></p>
 <h3 id="webpack-作用"><a href="#webpack-作用" class="headerlink" title="webpack 作用"></a>webpack 作用</h3><p>把es6 的import 代码转换成浏览器能识别的代码  wenpack所能转换的es6代码 仅限于 import 和 export </p>
 <h2 id="webpack安装"><a href="#webpack安装" class="headerlink" title="webpack安装"></a>webpack安装</h2><p>本地安装  </p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span></span><br><span class="line">npm install --save-dev webpack</span><br><span class="line">npm install --save-dev webpack-cli</span><br><span class="line"><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure>
+<pre class=" language-html"><code class="language-html"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>script</span><span class="token punctuation">></span></span><span class="token script language-javascript">
+npm install <span class="token operator">--</span>save<span class="token operator">-</span>dev webpack
+npm install <span class="token operator">--</span>save<span class="token operator">-</span>dev webpack<span class="token operator">-</span>cli
+</span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>script</span><span class="token punctuation">></span></span></code></pre>
 <h2 id="初始化本地项目"><a href="#初始化本地项目" class="headerlink" title="初始化本地项目"></a>初始化本地项目</h2><p>webpack的配置文件是 <code>webpack.config.js</code><br>新建项目 项目结构如下 </p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span></span><br><span class="line"> webpack-demo</span><br><span class="line"><span class="actionscript">  |- <span class="class"><span class="keyword">package</span>.<span class="title">json</span></span></span></span><br><span class="line">  |- webpack.config.js</span><br><span class="line">  |- /dist</span><br><span class="line">    |- index.html</span><br><span class="line">  |- /src</span><br><span class="line">    |- index.js</span><br><span class="line"><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure>
+<pre class=" language-html"><code class="language-html"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>script</span><span class="token punctuation">></span></span><span class="token script language-javascript">
+ webpack<span class="token operator">-</span>demo
+  <span class="token operator">|</span><span class="token operator">-</span> <span class="token keyword">package</span><span class="token punctuation">.</span>json
+  <span class="token operator">|</span><span class="token operator">-</span> webpack<span class="token punctuation">.</span>config<span class="token punctuation">.</span>js
+  <span class="token operator">|</span><span class="token operator">-</span> <span class="token operator">/</span>dist
+    <span class="token operator">|</span><span class="token operator">-</span> index<span class="token punctuation">.</span>html
+  <span class="token operator">|</span><span class="token operator">-</span> <span class="token operator">/</span>src
+    <span class="token operator">|</span><span class="token operator">-</span> index<span class="token punctuation">.</span>js
+</span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>script</span><span class="token punctuation">></span></span></code></pre>
 <h2 id="require-import-export-关系"><a href="#require-import-export-关系" class="headerlink" title="require import/export 关系"></a>require import/export 关系</h2><blockquote>
 <p>两者相同点</p>
 </blockquote>
@@ -445,21 +461,85 @@
 <li>插件(plugins)  辅助webpack用的 </li>
 </ul>
 <h3 id="entry-入口"><a href="#entry-入口" class="headerlink" title="entry 入口"></a>entry 入口</h3><p>入口起点(entry point)指示 webpack 应该使用哪个模块，来作为构建其内部依赖图的开始。进入入口起点后，webpack 会找出有哪些模块和库是入口起点（直接和间接）依赖的。<br>每个依赖项随即被处理，最后输出到称之为 bundles 的文件中。<br>webpack通过这个entry入口来查找入口文件  入口文件比如 <code>vue</code>中的<code>main.js</code> 里面包含了很多的组件或依赖</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span></span><br><span class="line"><span class="actionscript">    <span class="comment">// 在webpack.config.js</span></span></span><br><span class="line"><span class="actionscript">    <span class="comment">// module.exports是commonjs的规范  </span></span></span><br><span class="line"><span class="javascript"><span class="built_in">module</span>.exports = &#123;</span></span><br><span class="line"><span class="actionscript">  entry: <span class="string">'./src/index.js'</span></span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure>
+<pre class=" language-html"><code class="language-html"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>script</span><span class="token punctuation">></span></span><span class="token script language-javascript">
+    <span class="token comment" spellcheck="true">// 在webpack.config.js</span>
+    <span class="token comment" spellcheck="true">// module.exports是commonjs的规范  </span>
+module<span class="token punctuation">.</span>exports <span class="token operator">=</span> <span class="token punctuation">{</span>
+  entry<span class="token punctuation">:</span> <span class="token string">'./src/index.js'</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+</span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>script</span><span class="token punctuation">></span></span></code></pre>
 <h3 id="输出-output"><a href="#输出-output" class="headerlink" title="输出(output)"></a>输出(output)</h3><p>output 属性告诉 webpack 在哪里输出它所创建的 bundles，以及如何命名这些文件。</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span></span><br><span class="line"><span class="actionscript">    <span class="comment">// 在webpack.config.js</span></span></span><br><span class="line"><span class="javascript"><span class="built_in">module</span>.exports = &#123;</span></span><br><span class="line"><span class="actionscript">  entry: <span class="string">'main.js'</span>,</span></span><br><span class="line">  output: &#123;</span><br><span class="line"><span class="actionscript">    path: path.resolve(__dirname, <span class="string">'dist'</span>),</span></span><br><span class="line"><span class="actionscript">    filename: <span class="string">'main.js'</span></span></span><br><span class="line">  &#125;&#125;;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure>
+<pre class=" language-html"><code class="language-html"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>script</span><span class="token punctuation">></span></span><span class="token script language-javascript">
+    <span class="token comment" spellcheck="true">// 在webpack.config.js</span>
+module<span class="token punctuation">.</span>exports <span class="token operator">=</span> <span class="token punctuation">{</span>
+  entry<span class="token punctuation">:</span> <span class="token string">'main.js'</span><span class="token punctuation">,</span>
+  output<span class="token punctuation">:</span> <span class="token punctuation">{</span>
+    path<span class="token punctuation">:</span> path<span class="token punctuation">.</span><span class="token function">resolve</span><span class="token punctuation">(</span>__dirname<span class="token punctuation">,</span> <span class="token string">'dist'</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    filename<span class="token punctuation">:</span> <span class="token string">'main.js'</span>
+  <span class="token punctuation">}</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+
+</span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>script</span><span class="token punctuation">></span></span></code></pre>
 <h3 id="loader"><a href="#loader" class="headerlink" title="loader"></a>loader</h3><p>loader 让 webpack 能够去处理那些非 JavaScript 文件（webpack 自身只理解 JavaScript）。loader 可以将所有类型的文件转换为 webpack 能够处理的有效模块，然后你就可以利用 webpack 的打包能力，对它们进行处理。包括.css   less  sass   jpg  png 等。</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span></span><br><span class="line"><span class="javascript"><span class="built_in">module</span>.exports = &#123;</span></span><br><span class="line"><span class="actionscript">  entry: <span class="string">'./path/to/my/entry/file.js'</span>,</span></span><br><span class="line">  output: &#123;</span><br><span class="line"><span class="actionscript">    path: path.resolve(__dirname, <span class="string">'dist'</span>),</span></span><br><span class="line"><span class="actionscript">    filename: <span class="string">'my-first-webpack.bundle.js'</span></span></span><br><span class="line">  &#125;,</span><br><span class="line"><span class="javascript">  <span class="built_in">module</span>: &#123;</span></span><br><span class="line">    rules: [</span><br><span class="line"><span class="actionscript">      &#123; test: /\.txt$/, <span class="keyword">use</span>: <span class="string">'raw-loader'</span> &#125;</span></span><br><span class="line">    ]</span><br><span class="line">  &#125;&#125;;</span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure>
+<pre class=" language-html"><code class="language-html"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>script</span><span class="token punctuation">></span></span><span class="token script language-javascript">
+module<span class="token punctuation">.</span>exports <span class="token operator">=</span> <span class="token punctuation">{</span>
+  entry<span class="token punctuation">:</span> <span class="token string">'./path/to/my/entry/file.js'</span><span class="token punctuation">,</span>
+  output<span class="token punctuation">:</span> <span class="token punctuation">{</span>
+    path<span class="token punctuation">:</span> path<span class="token punctuation">.</span><span class="token function">resolve</span><span class="token punctuation">(</span>__dirname<span class="token punctuation">,</span> <span class="token string">'dist'</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    filename<span class="token punctuation">:</span> <span class="token string">'my-first-webpack.bundle.js'</span>
+  <span class="token punctuation">}</span><span class="token punctuation">,</span>
+  module<span class="token punctuation">:</span> <span class="token punctuation">{</span>
+    rules<span class="token punctuation">:</span> <span class="token punctuation">[</span>
+      <span class="token punctuation">{</span> test<span class="token punctuation">:</span> <span class="token regex">/\.txt$/</span><span class="token punctuation">,</span> use<span class="token punctuation">:</span> <span class="token string">'raw-loader'</span> <span class="token punctuation">}</span>
+    <span class="token punctuation">]</span>
+  <span class="token punctuation">}</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+</span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>script</span><span class="token punctuation">></span></span></code></pre>
 <h3 id="插件-plugins"><a href="#插件-plugins" class="headerlink" title="插件 plugins"></a>插件 plugins</h3><p><code>plugins</code> 被用于转换某些类型的模块,插件的范围包括，从打包优化和压缩，一直到重新定义环境中的变量。插件接口功能极其强大，可以用来处理各种各样的任务。</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span></span><br><span class="line"><span class="javascript"><span class="keyword">const</span> HtmlWebpackPlugin = <span class="built_in">require</span>(<span class="string">'html-webpack-plugin'</span>); <span class="comment">// 通过 npm 安装</span></span></span><br><span class="line"><span class="javascript"><span class="keyword">const</span> webpack = <span class="built_in">require</span>(<span class="string">'webpack'</span>); <span class="comment">// 用于访问内置插件</span></span></span><br><span class="line"><span class="javascript"><span class="built_in">module</span>.exports = &#123;</span></span><br><span class="line"><span class="javascript">  <span class="built_in">module</span>: &#123;</span></span><br><span class="line">    rules: [</span><br><span class="line"><span class="actionscript">      &#123; test: /\.txt$/, <span class="keyword">use</span>: <span class="string">'raw-loader'</span> &#125;</span></span><br><span class="line">    ]</span><br><span class="line">  &#125;,</span><br><span class="line">  plugins: [</span><br><span class="line"><span class="actionscript">    <span class="keyword">new</span> webpack.optimize.UglifyJsPlugin(),</span></span><br><span class="line"><span class="actionscript">    <span class="keyword">new</span> HtmlWebpackPlugin(&#123;template: <span class="string">'./src/index.html'</span>&#125;)</span></span><br><span class="line">  ]</span><br><span class="line"></span><br><span class="line">&#125;</span><br><span class="line"><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure>
+<pre class=" language-html"><code class="language-html"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>script</span><span class="token punctuation">></span></span><span class="token script language-javascript">
+<span class="token keyword">const</span> HtmlWebpackPlugin <span class="token operator">=</span> <span class="token function">require</span><span class="token punctuation">(</span><span class="token string">'html-webpack-plugin'</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment" spellcheck="true">// 通过 npm 安装</span>
+<span class="token keyword">const</span> webpack <span class="token operator">=</span> <span class="token function">require</span><span class="token punctuation">(</span><span class="token string">'webpack'</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment" spellcheck="true">// 用于访问内置插件</span>
+module<span class="token punctuation">.</span>exports <span class="token operator">=</span> <span class="token punctuation">{</span>
+  module<span class="token punctuation">:</span> <span class="token punctuation">{</span>
+    rules<span class="token punctuation">:</span> <span class="token punctuation">[</span>
+      <span class="token punctuation">{</span> test<span class="token punctuation">:</span> <span class="token regex">/\.txt$/</span><span class="token punctuation">,</span> use<span class="token punctuation">:</span> <span class="token string">'raw-loader'</span> <span class="token punctuation">}</span>
+    <span class="token punctuation">]</span>
+  <span class="token punctuation">}</span><span class="token punctuation">,</span>
+  plugins<span class="token punctuation">:</span> <span class="token punctuation">[</span>
+    <span class="token keyword">new</span> <span class="token class-name">webpack<span class="token punctuation">.</span>optimize<span class="token punctuation">.</span>UglifyJsPlugin</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token keyword">new</span> <span class="token class-name">HtmlWebpackPlugin</span><span class="token punctuation">(</span><span class="token punctuation">{</span>template<span class="token punctuation">:</span> <span class="token string">'./src/index.html'</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+  <span class="token punctuation">]</span>
+
+<span class="token punctuation">}</span>
+</span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>script</span><span class="token punctuation">></span></span></code></pre>
 <h3 id="管理输出"><a href="#管理输出" class="headerlink" title="管理输出"></a>管理输出</h3><p>每次修改出口文件 都需要手动修改index.html里面的js文件 这种方式很麻烦 webpack提供了一种解决方法<br><code>HtmlWebpackPlugin</code> <a href="https://www.webpackjs.com/guides/output-management/#%E8%AE%BE%E5%AE%9A-htmlwebpackplugin" target="_blank" rel="noopener" title="HtmlWebpackPlugin">HtmlWebpackPlugin</a></p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span></span><br><span class="line"><span class="javascript"><span class="built_in">module</span>.exports = &#123;</span></span><br><span class="line">  entry: &#123;</span><br><span class="line"><span class="actionscript">    app: <span class="string">'./src/index.js'</span>,</span></span><br><span class="line"><span class="actionscript">    print: <span class="string">'./src/print.js'</span></span></span><br><span class="line">  &#125;,</span><br><span class="line">  output: &#123;</span><br><span class="line"><span class="actionscript">    <span class="comment">// 分别生成app.bundle.js 和 print.bundle.js</span></span></span><br><span class="line"><span class="actionscript">    filename: <span class="string">'[name].bundle.js'</span>,</span></span><br><span class="line"><span class="actionscript">    path: path.resolve(__dirname, <span class="string">'dist'</span>)</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure>
+<pre class=" language-html"><code class="language-html"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>script</span><span class="token punctuation">></span></span><span class="token script language-javascript">
+module<span class="token punctuation">.</span>exports <span class="token operator">=</span> <span class="token punctuation">{</span>
+  entry<span class="token punctuation">:</span> <span class="token punctuation">{</span>
+    app<span class="token punctuation">:</span> <span class="token string">'./src/index.js'</span><span class="token punctuation">,</span>
+    print<span class="token punctuation">:</span> <span class="token string">'./src/print.js'</span>
+  <span class="token punctuation">}</span><span class="token punctuation">,</span>
+  output<span class="token punctuation">:</span> <span class="token punctuation">{</span>
+    <span class="token comment" spellcheck="true">// 分别生成app.bundle.js 和 print.bundle.js</span>
+    filename<span class="token punctuation">:</span> <span class="token string">'[name].bundle.js'</span><span class="token punctuation">,</span>
+    path<span class="token punctuation">:</span> path<span class="token punctuation">.</span><span class="token function">resolve</span><span class="token punctuation">(</span>__dirname<span class="token punctuation">,</span> <span class="token string">'dist'</span><span class="token punctuation">)</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>
+</span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>script</span><span class="token punctuation">></span></span></code></pre>
 <h3 id="source-map"><a href="#source-map" class="headerlink" title="source map"></a>source map</h3><p>用于追溯错误代码位置  在webpack.config.js里面加<br><code>devtool: &#39;inline-source-map&#39;,</code></p>
 <h3 id="热加载-webpack-dev-server"><a href="#热加载-webpack-dev-server" class="headerlink" title="热加载  webpack-dev-server"></a>热加载  webpack-dev-server</h3><p>每次更改文件都必须从新打包一次，很麻烦<br>启用热加载能够帮助我们监听代码的变化自动进行打包代码</p>
 <h3 id="热模块替换（HMR"><a href="#热模块替换（HMR" class="headerlink" title="热模块替换（HMR)"></a>热模块替换（HMR)</h3><p>官方文档有问题  </p>
 <h3 id="tree-shaking-中文官网是错误的"><a href="#tree-shaking-中文官网是错误的" class="headerlink" title="tree shaking  中文官网是错误的"></a>tree shaking  中文官网是错误的</h3><p>tree shaking 是一个术语，通常用于描述移除 JavaScript 上下文中的未引用代码<br>webpack在打包的时候默认删除文件中未使用的部分。<br>如 在index.js的同级新建math.js 里面有两个函数<br>如果只引入cube  那么在打包的时候square是不会被打包进来的  如果需要square被导入 需要在webpack.config.js里面加入<br><code>mode: &#39;development&#39;</code></p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span></span><br><span class="line"><span class="javascript"><span class="keyword">export</span> <span class="function"><span class="keyword">function</span> <span class="title">square</span>(<span class="params">x</span>) </span>&#123;</span></span><br><span class="line"><span class="actionscript">    <span class="keyword">return</span> x * x;</span></span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line"><span class="javascript">  <span class="keyword">export</span> <span class="function"><span class="keyword">function</span> <span class="title">cube</span>(<span class="params">x</span>) </span>&#123;</span></span><br><span class="line"><span class="actionscript">    <span class="keyword">return</span> x * x * x;</span></span><br><span class="line">  &#125;</span><br><span class="line"><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure>
+<pre class=" language-html"><code class="language-html"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>script</span><span class="token punctuation">></span></span><span class="token script language-javascript">
+<span class="token keyword">export</span> <span class="token keyword">function</span> <span class="token function">square</span><span class="token punctuation">(</span>x<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> x <span class="token operator">*</span> x<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
 
+  <span class="token keyword">export</span> <span class="token keyword">function</span> <span class="token function">cube</span><span class="token punctuation">(</span>x<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> x <span class="token operator">*</span> x <span class="token operator">*</span> x<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+</span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>script</span><span class="token punctuation">></span></span></code></pre>
 <h3 id="生产环境构建"><a href="#生产环境构建" class="headerlink" title="生产环境构建"></a>生产环境构建</h3><p>开发环境(<code>development</code>)和生产环境(<code>production</code>)的构建目标差异很大。在开发环境中，我们需要具有强大的、具有<code>实时重新加载(live reloading)</code>或<code>热模块替换(hot module replacement)</code>能力的 <code>source map</code> 和 <code>localhost server</code>。而在生产环境中，我们的目标则转向于关注更小的 bundle，更轻量的 source map，以及更优化的资源，以改善加载时间。由于要遵循逻辑分离，我们通常建议为每个环境编写彼此独立的 webpack 配置。</p>
 <ul>
 <li>webpack.common.js 公用的配置文件</li>
@@ -467,14 +547,64 @@
 <li>webpack.prod.js 生产时的配置文件 </li>
 </ul>
 <h3 id="代码分离"><a href="#代码分离" class="headerlink" title="代码分离"></a>代码分离</h3><ul>
-<li>公共模块分离<br>比如a.js里面引入lodash b.js里面也引入lodash 那么在打包的时候打包生成的每个文件都包含lodash 既然lodash相同 那么可以用一种方法把lodash分离<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span></span><br><span class="line"><span class="javascript"> <span class="keyword">const</span> path = <span class="built_in">require</span>(<span class="string">'path'</span>);</span></span><br><span class="line"><span class="javascript"> <span class="keyword">const</span> &#123; CleanWebpackPlugin &#125; = <span class="built_in">require</span>(<span class="string">'clean-webpack-plugin'</span>);</span></span><br><span class="line"><span class="javascript"> <span class="keyword">const</span> HtmlWebpackPlugin = <span class="built_in">require</span>(<span class="string">'html-webpack-plugin'</span>);</span></span><br><span class="line"></span><br><span class="line"><span class="javascript"> <span class="built_in">module</span>.exports = &#123;</span></span><br><span class="line">   entry: &#123;</span><br><span class="line"><span class="actionscript">    index: <span class="string">'./src/index.js'</span>,</span></span><br><span class="line"><span class="actionscript">    another: <span class="string">'./src/another-module.js'</span></span></span><br><span class="line">   &#125;,</span><br><span class="line">   plugins: [</span><br><span class="line"><span class="actionscript">     <span class="comment">// new CleanWebpackPlugin(['dist/*']) for &lt; v2 versions of CleanWebpackPlugin</span></span></span><br><span class="line"><span class="actionscript">     <span class="keyword">new</span> CleanWebpackPlugin(),</span></span><br><span class="line"><span class="actionscript">     <span class="keyword">new</span> HtmlWebpackPlugin(&#123;</span></span><br><span class="line"><span class="actionscript">       title: <span class="string">'Production'</span></span></span><br><span class="line">     &#125;)</span><br><span class="line">   ],</span><br><span class="line"><span class="actionscript">   optimization: &#123;  <span class="comment">// 公共代码抽离</span></span></span><br><span class="line">         splitChunks: &#123;</span><br><span class="line"><span class="actionscript">           chunks: <span class="string">'all'</span></span></span><br><span class="line">         &#125;</span><br><span class="line">       &#125;,</span><br><span class="line">   output: &#123;</span><br><span class="line"><span class="actionscript">     filename: <span class="string">'[name].bundle.js'</span>,</span></span><br><span class="line"><span class="actionscript">     path: path.resolve(__dirname, <span class="string">'dist'</span>)</span></span><br><span class="line">   &#125;</span><br><span class="line"> &#125;;</span><br><span class="line"><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<h3 id="缓存"><a href="#缓存" class="headerlink" title="缓存"></a>缓存</h3>使用 <code>webpack</code> 来打包我们的模块化后的应用程序，<code>webpack</code> 会生成一个可部署的 <code>/dist</code> 目录，然后把打包后的内容放置在此目录中。只要 <code>/dist</code> 目录中的内容部署到服务器上，客户端（通常是浏览器）就能够访问网站此服务器的网站及其资源。而最后一步获取资源是比较耗费时间的，这就是为什么浏览器使用一种名为 <code>缓存</code> 的技术。可以通过命中缓存，以降低网络流量，使网站加载速度更快，然而，如果我们在部署新版本时不更改资源的文件名，浏览器可能会认为它没有被更新，就会使用它的缓存版本。由于缓存的存在，当你需要获取新的代码时，就会显得很棘手。<br>webpack解决缓存<br><code>filename: &#39;[name].[contenthash].js&#39;</code></li>
+<li>公共模块分离<br>比如a.js里面引入lodash b.js里面也引入lodash 那么在打包的时候打包生成的每个文件都包含lodash 既然lodash相同 那么可以用一种方法把lodash分离<pre class=" language-html"><code class="language-html"></code></pre>
+</li>
 </ul>
-<blockquote>
-<p>runtime<br> runtime 指的是 webpack 的运行环境(具体作用就是模块解析, 加载) 和 模块信息清单<br> 解决方法<br> <code>runtimeChunk: &#39;single&#39;</code><br>缓存基本不变的依赖<br>将第三方库（例如lodash或）提取到单独的vendor块中也是一种很好的做法，因为它们比我们的本地源代码更不可能更改。<br>后端缓存这些基本不变的依赖对用户的体验很好</p>
-</blockquote>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span></span><br><span class="line"> optimization: &#123;</span><br><span class="line"><span class="actionscript">    runtimeChunk: <span class="string">'single'</span>,</span></span><br><span class="line">    splitChunks: &#123;</span><br><span class="line">      cacheGroups: &#123;</span><br><span class="line">        vendor: &#123;</span><br><span class="line"><span class="javascript">          test: <span class="regexp">/[\\/]node_modules[\\/]/</span>,</span></span><br><span class="line"><span class="actionscript">          name: <span class="string">'vendors'</span>,</span></span><br><span class="line"><span class="actionscript">          chunks: <span class="string">'all'</span></span></span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">       &#125;,</span><br><span class="line"><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<h3 id="分离模块的好处"><a href="#分离模块的好处" class="headerlink" title="分离模块的好处"></a>分离模块的好处</h3><p>依赖的模块和webpack运行所依赖的环境分离开来<br>可以让后端对这俩文件进行缓存 也就是说这俩文件缓存之后 日后用户如果第二次及以后进入项目的时候 下载这俩文件将会从缓存里面读取(那么文件的加载速度将会更快 用户体验回更好 打开网页秒开)</p>
+<script>
+ const path = require('path');
+ const { CleanWebpackPlugin } = require('clean-webpack-plugin');
+ const HtmlWebpackPlugin = require('html-webpack-plugin');
+
+ module.exports = {
+   entry: {
+    index: './src/index.js',
+    another: './src/another-module.js'
+   },
+   plugins: [
+     // new CleanWebpackPlugin(['dist/*']) for < v2 versions of CleanWebpackPlugin
+     new CleanWebpackPlugin(),
+     new HtmlWebpackPlugin({
+       title: 'Production'
+     })
+   ],
+   optimization: {  // 公共代码抽离
+         splitChunks: {
+           chunks: 'all'
+         }
+       },
+   output: {
+     filename: '[name].bundle.js',
+     path: path.resolve(__dirname, 'dist')
+   }
+ };
+</script>
+<pre><code>### 缓存 
+使用 `webpack` 来打包我们的模块化后的应用程序，`webpack` 会生成一个可部署的 `/dist` 目录，然后把打包后的内容放置在此目录中。只要 `/dist` 目录中的内容部署到服务器上，客户端（通常是浏览器）就能够访问网站此服务器的网站及其资源。而最后一步获取资源是比较耗费时间的，这就是为什么浏览器使用一种名为 `缓存` 的技术。可以通过命中缓存，以降低网络流量，使网站加载速度更快，然而，如果我们在部署新版本时不更改资源的文件名，浏览器可能会认为它没有被更新，就会使用它的缓存版本。由于缓存的存在，当你需要获取新的代码时，就会显得很棘手。
+webpack解决缓存
+`filename: &#39;[name].[contenthash].js&#39;`
+
+&gt; runtime
+ runtime 指的是 webpack 的运行环境(具体作用就是模块解析, 加载) 和 模块信息清单
+ 解决方法
+ `runtimeChunk: &#39;single&#39;`
+&gt; 缓存基本不变的依赖 
+将第三方库（例如lodash或）提取到单独的vendor块中也是一种很好的做法，因为它们比我们的本地源代码更不可能更改。
+后端缓存这些基本不变的依赖对用户的体验很好
+```html
+&lt;script&gt;
+ optimization: {
+    runtimeChunk: &#39;single&#39;,
+    splitChunks: {
+      cacheGroups: {
+        vendor: {
+          test: /[\\/]node_modules[\\/]/,
+          name: &#39;vendors&#39;,
+          chunks: &#39;all&#39;
+        }
+      }
+    }
+       },
+&lt;/script&gt;</code></pre><h3 id="分离模块的好处"><a href="#分离模块的好处" class="headerlink" title="分离模块的好处"></a>分离模块的好处</h3><p>依赖的模块和webpack运行所依赖的环境分离开来<br>可以让后端对这俩文件进行缓存 也就是说这俩文件缓存之后 日后用户如果第二次及以后进入项目的时候 下载这俩文件将会从缓存里面读取(那么文件的加载速度将会更快 用户体验回更好 打开网页秒开)</p>
 
             </div>
             <hr/>
@@ -582,7 +712,7 @@
     let gitalk = new Gitalk({
         clientID: '8c9b77e4c087dbfd7d5b',
         clientSecret: '4785f2b3d1af1d454c9df958719d5b084229b7b9',
-        repo: 'todoit.top',
+        repo: 'moYuWei123.github.io',
         owner: '半岛铁盒',
         admin: "半岛铁盒",
         id: '2019-02-28T09-12-45',
@@ -848,6 +978,9 @@ mapState  –  当一个组件需要获取多个状态时候，将这些状态�
             |&nbsp;Powered by&nbsp;<a href="https://hexo.io/" target="_blank">Hexo</a>
             |&nbsp;Theme&nbsp;<a href="https://github.com/blinkfox/hexo-theme-matery" target="_blank">Matery</a>
             <br>
+            
+            &nbsp;<i class="fas fa-chart-area"></i>&nbsp;站点总字数:&nbsp;<span
+                class="white-color">22.8k</span>&nbsp;字
             
             
             

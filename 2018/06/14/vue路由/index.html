@@ -29,7 +29,7 @@
 
     <script src="/libs/jquery/jquery.min.js"></script>
     
-<meta name="generator" content="Hexo 4.2.0"></head>
+<meta name="generator" content="Hexo 4.2.0"><link rel="stylesheet" href="/css/prism-tomorrow.css" type="text/css"></head>
 
 
 <body>
@@ -401,6 +401,11 @@
                 
 
                 
+                <div class="info-break-policy">
+                    <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
+                    2.4k
+                </div>
+                
 
                 
 
@@ -444,67 +449,122 @@
 <h3 id="npm安装vue路由"><a href="#npm安装vue路由" class="headerlink" title="npm安装vue路由"></a>npm安装vue路由</h3><blockquote>
 <p>这一步是安装路由 保存到我们package.json 里面的dependencies里面</p>
 </blockquote>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cnpm install vue-router --save</span><br></pre></td></tr></table></figure>
-<h3 id="路由起步"><a href="#路由起步" class="headerlink" title="路由起步"></a>路由起步</h3><blockquote>
+<pre><code>cnpm install vue-router --save</code></pre><h3 id="路由起步"><a href="#路由起步" class="headerlink" title="路由起步"></a>路由起步</h3><blockquote>
 <p>配置路由文件</p>
 </blockquote>
 <ol>
 <li>在main.js的同级目录新建一个router的文件夹(这个文件夹存放的是我们路由的配置文件)</li>
-<li>在这个文件夹下创建index.js 里面写上<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">import Vue from &#39;vue&#39;</span><br><span class="line">import Router from &#39;vue-router&#39;</span><br><span class="line"></span><br><span class="line">Vue.use(Router)</span><br><span class="line">&#x2F;&#x2F; 上面三个是引入vue-router(你安装路由之后不引入相当于做无用功)</span><br><span class="line">export default new Router(&#123;  &#x2F;&#x2F; 把我们的路由配置文件暴露出去</span><br><span class="line">  mode: &#39;history&#39;, </span><br><span class="line">  &#x2F;&#x2F; vue-router 默认 hash 模式 —— 使用 URL 的 hash 来模拟一个完整的 URL，于是当 URL 改变时，页面不会重新加载。如果不想&#x2F;&#x2F;&#x2F; 要很丑的 hash，我们可以用路由的 history 模式</span><br><span class="line">  routes: [  &#x2F;&#x2F; 这个存放的是我们路由的配置文件</span><br><span class="line">    </span><br><span class="line">  ]</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure></li>
-<li>在view目录下新建两个文件夹 一个是index 一个是mine 这个文件夹代表两个页面(这个一个规范)  一个是index页面 一个是mine页面 分别在mine和index下面新建index.vue (创建我们的组件) 里面分别写上内容 ‘首页’ ‘mine页’<br><img src="%22https://raw.githubusercontent.com/208895638/teachVue/master/%E6%88%AA%E5%9B%BE/vue%E7%9B%AE%E5%BD%95%E6%88%AA%E5%9B%BE.jpg%22" alt="项目结构" title="项目结构"></li>
-<li>在我们的router文件夹下的index.js里面引入我们的组件<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">import index from &quot;@&#x2F;views&#x2F;index&#x2F;index&quot; &#x2F;&#x2F; 引入index组件</span><br><span class="line">import mine from &quot;@&#x2F;views&#x2F;mine&#x2F;index&quot; &#x2F;&#x2F; 引入mine组件</span><br></pre></td></tr></table></figure></li>
-<li>配置路由</li>
+<li>在这个文件夹下创建index.js 里面写上<pre><code>import Vue from &#39;vue&#39;
+import Router from &#39;vue-router&#39;
+</code></pre></li>
 </ol>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">export default new Router(&#123;</span><br><span class="line">  mode: &#39;history&#39;,  &#x2F;&#x2F; 启用history路由</span><br><span class="line">  routes: [ &#x2F;&#x2F; 这里面是路由的配置项</span><br><span class="line">    &#123;</span><br><span class="line">      path: &#39;&#x2F;&#39;,  &#x2F;&#x2F; 这个是我们访问浏览器的地址</span><br><span class="line">      name: &#39;index&#39;,  &#x2F;&#x2F; 这个是我们给路由起的名称</span><br><span class="line">      component: index  &#x2F;&#x2F; 这个是 地址对应的组件</span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      path: &#39;&#x2F;mine&#39;, &#x2F;&#x2F; 这个是我们访问浏览器的地址</span><br><span class="line">      name: &#39;mine&#39;,  &#x2F;&#x2F; 这个是我们给路由起的名称</span><br><span class="line">      component: mine  &#x2F;&#x2F; 这个是 地址对应的组件</span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
-<ol start="6">
-<li>上一步就代表路由配置完成 我们需要把我们的路由配置挂载到我们的vue实例上 在main.js里面操作<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">import Vue from &#39;vue&#39;</span><br><span class="line">import App from &#39;.&#x2F;App.vue&#39;</span><br><span class="line">import router from &#39;.&#x2F;router&#x2F;index&#39;  &#x2F;&#x2F; 引入我们刚刚配置的路由文件</span><br><span class="line">Vue.config.productionTip &#x3D; false</span><br><span class="line">new Vue(&#123;</span><br><span class="line">  router, &#x2F;&#x2F; 把路由挂载到vue实例上</span><br><span class="line">  render: h &#x3D;&gt; h(App)</span><br><span class="line">&#125;).$mount(&#39;#app&#39;)</span><br></pre></td></tr></table></figure></li>
-<li>最后一步 在我们的app.vue里面加一个组件router-view<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">&lt;router-link to&#x3D;&quot;&#x2F;&quot;&gt;跳转到首页&lt;&#x2F;router-link&gt;</span><br><span class="line">&lt;router-link :to&#x3D;&quot;&#123;path:&#39;&#x2F;&#39;&#125;&quot;&gt;跳转到首页&lt;&#x2F;router-link&gt;</span><br><span class="line">    &lt;router-link to&#x3D;&quot;&#x2F;mine&quot;&gt;跳转到mine页&lt;&#x2F;router-link&gt;</span><br><span class="line"></span><br><span class="line">    &lt;router-view&gt;&lt;&#x2F;router-view&gt;</span><br></pre></td></tr></table></figure>
-router-view这个组件是一个容器 我们页面的路由所对应的组件都渲染在这个容器里面<br>router-link是在vue里面做跳转链接用的 vue会把router-link渲染成a标签</li>
-<li>好了 一个最基本的路由完成 <h3 id="自动激活的-CSS-class-的链接-当router-link-里面的to地址与地址栏中的路由匹配一样时就自动激活router-link-active"><a href="#自动激活的-CSS-class-的链接-当router-link-里面的to地址与地址栏中的路由匹配一样时就自动激活router-link-active" class="headerlink" title="自动激活的 CSS class 的链接 当router-link 里面的to地址与地址栏中的路由匹配一样时就自动激活router-link-active"></a>自动激活的 CSS class 的链接 当router-link 里面的to地址与地址栏中的路由匹配一样时就自动激活router-link-active</h3>如<br>当前路由为 /home 而<router-link to="/home" exact></router-link> router-link-active这个class名称就会自动被激活<blockquote>
-<p>自定义激活class名称  linkActiveClass</p>
-</blockquote>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">export default new Router(&#123;</span><br><span class="line">  mode: &#39;history&#39;,  &#x2F;&#x2F; 启用history路由</span><br><span class="line">  linkActiveClass:&quot;r-active&quot;,  &#x2F;&#x2F; 这个就是设置激活是的class名称</span><br><span class="line">  routes: [ &#x2F;&#x2F; 这里面是路由的配置项</span><br><span class="line">    &#123;</span><br><span class="line">      path: &#39;&#x2F;&#39;,  &#x2F;&#x2F; 这个是我们访问浏览器的地址</span><br><span class="line">      name: &#39;index&#39;,  &#x2F;&#x2F; 这个是我们给路由起的名称</span><br><span class="line">      component: index  &#x2F;&#x2F; 这个是 地址对应的组件</span><br><span class="line">    &#125;,</span><br><span class="line">  ]</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
-
-</li>
-</ol>
-<h3 id="路由传递参数"><a href="#路由传递参数" class="headerlink" title="路由传递参数"></a>路由传递参数</h3><ul>
-<li><p>动态路由</p>
-<!-- /a
+<p>Vue.use(Router)<br>// 上面三个是引入vue-router(你安装路由之后不引入相当于做无用功)<br>export default new Router({  // 把我们的路由配置文件暴露出去<br>  mode: ‘history’,<br>  // vue-router 默认 hash 模式 —— 使用 URL 的 hash 来模拟一个完整的 URL，于是当 URL 改变时，页面不会重新加载。如果不想/// 要很丑的 hash，我们可以用路由的 history 模式<br>  routes: [  // 这个存放的是我们路由的配置文件</p>
+<p>  ]<br>})</p>
+<pre><code>3. 在view目录下新建两个文件夹 一个是index 一个是mine 这个文件夹代表两个页面(这个一个规范)  一个是index页面 一个是mine页面 分别在mine和index下面新建index.vue (创建我们的组件) 里面分别写上内容 &#39;首页&#39; &#39;mine页&#39;
+![项目结构](&quot;https://raw.githubusercontent.com/208895638/teachVue/master/%E6%88%AA%E5%9B%BE/vue%E7%9B%AE%E5%BD%95%E6%88%AA%E5%9B%BE.jpg&quot; &quot;项目结构&quot;)
+4. 在我们的router文件夹下的index.js里面引入我们的组件</code></pre><p>import index from “@/views/index/index” // 引入index组件<br>import mine from “@/views/mine/index” // 引入mine组件</p>
+<pre><code>5. 配置路由
+</code></pre><p>export default new Router({<br>  mode: ‘history’,  // 启用history路由<br>  routes: [ // 这里面是路由的配置项<br>    {<br>      path: ‘/‘,  // 这个是我们访问浏览器的地址<br>      name: ‘index’,  // 这个是我们给路由起的名称<br>      component: index  // 这个是 地址对应的组件<br>    },<br>    {<br>      path: ‘/mine’, // 这个是我们访问浏览器的地址<br>      name: ‘mine’,  // 这个是我们给路由起的名称<br>      component: mine  // 这个是 地址对应的组件<br>    }<br>  ]<br>})</p>
+<pre><code>6. 上一步就代表路由配置完成 我们需要把我们的路由配置挂载到我们的vue实例上 在main.js里面操作</code></pre><p>import Vue from ‘vue’<br>import App from ‘./App.vue’<br>import router from ‘./router/index’  // 引入我们刚刚配置的路由文件<br>Vue.config.productionTip = false<br>new Vue({<br>  router, // 把路由挂载到vue实例上<br>  render: h =&gt; h(App)<br>}).$mount(‘#app’)</p>
+<pre><code>7. 最后一步 在我们的app.vue里面加一个组件router-view</code></pre><p><router-link to="/">跳转到首页</router-link><br><router-link :to="{path:'/'}">跳转到首页</router-link><br>    <router-link to="/mine">跳转到mine页</router-link></p>
+<pre><code>&lt;router-view&gt;&lt;/router-view&gt;</code></pre><pre><code>router-view这个组件是一个容器 我们页面的路由所对应的组件都渲染在这个容器里面
+router-link是在vue里面做跳转链接用的 vue会把router-link渲染成a标签
+8. 好了 一个最基本的路由完成 
+### 自动激活的 CSS class 的链接 当router-link 里面的to地址与地址栏中的路由匹配一样时就自动激活router-link-active
+如
+当前路由为 /home 而&lt;router-link to=&quot;/home&quot; exact&gt;&lt;/router-link&gt; router-link-active这个class名称就会自动被激活
+&gt; 自定义激活class名称  linkActiveClass</code></pre><p>export default new Router({<br>  mode: ‘history’,  // 启用history路由<br>  linkActiveClass:”r-active”,  // 这个就是设置激活是的class名称<br>  routes: [ // 这里面是路由的配置项<br>    {<br>      path: ‘/‘,  // 这个是我们访问浏览器的地址<br>      name: ‘index’,  // 这个是我们给路由起的名称<br>      component: index  // 这个是 地址对应的组件<br>    },<br>  ]<br>})</p>
+<pre><code>
+###  路由传递参数 
++ 动态路由
+&lt;!-- /a
 /b
 /c
-home -->
-<p>简介 我们经常需要把某种模式匹配到的所有路由，全都映射到同个组件。例如，我们有一个 User 组件，对于所有 ID 各不相同的用户，都要使用这个组件来渲染。那么，我们可以在 vue-router 的路由路径中使用“动态路径参数”(dynamic segment) 来达到这个效果：</p>
-</li>
-<li><p>配置动态路由</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    path : &quot;&#x2F;mine&#x2F;:id&quot;, &#x2F;&#x2F; 动态路由</span><br><span class="line">    name : &quot;mine&quot; ,</span><br><span class="line">    component: mine</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>使用的时候 会自动匹配1，2，3，4 到mine组件</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&lt;router-link to&#x3D;&quot;&#x2F;mine&#x2F;1&quot;&gt;跳转到mine页&lt;&#x2F;router-link&gt;</span><br><span class="line">&lt;router-link to&#x3D;&quot;&#x2F;mine&#x2F;2&quot;&gt;跳转到mine页&lt;&#x2F;router-link&gt;</span><br><span class="line">&lt;router-link to&#x3D;&quot;&#x2F;mine&#x2F;3&quot;&gt;跳转到mine页&lt;&#x2F;router-link&gt;</span><br><span class="line">&lt;router-link to&#x3D;&quot;&#x2F;mine&#x2F;4&quot;&gt;跳转到mine页&lt;&#x2F;router-link&gt;</span><br><span class="line">&lt;router-link :to&#x3D;&quot;&#123;name:&#39;mine&#39;,params:&#123;id:1&#125;&#125;&quot;&gt;跳转到mine页&lt;&#x2F;router-link&gt;</span><br><span class="line">这里需要注意的一点就是 当路由是动态路由的时候我们得用命名路由的方式跳转</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>query传值</p>
-</li>
-</ul>
-<p>直接在路由后面传递需要传递的参数<br>获取这个参数 可以使用 this.$route.query $route 当前路由对象</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&lt;router-link to&#x3D;&quot;&#x2F;user?username&#x3D;&#39;张三&#39;&amp;age&#x3D;&#39;40&#39;&amp;sex&#x3D;&#39;男&#39;&quot; tag&#x3D;&quot;h2&quot;&gt;跳转到user页&lt;&#x2F;router-link&gt;</span><br></pre></td></tr></table></figure>
-<h3 id="嵌套路由"><a href="#嵌套路由" class="headerlink" title="嵌套路由"></a>嵌套路由</h3><blockquote>
-<p>简介 实际生活中的应用界面，通常由多层嵌套的组件组合而成。同样地，URL 中各：</p>
-</blockquote>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">&#x2F;user&#x2F;profile                     &#x2F;user&#x2F;posts</span><br><span class="line">+------------------+                  +-----------------+</span><br><span class="line">| User             |                  | User            |</span><br><span class="line">| +--------------+ |                  | +-------------+ |</span><br><span class="line">| | Profile      | |  +------------&gt;  | | Posts       | |</span><br><span class="line">| |              | |                  | |             | |</span><br><span class="line">| +--------------+ |                  | +-------------+ |</span><br><span class="line">+------------------+                  +-----------------+</span><br></pre></td></tr></table></figure>
-<blockquote>
+home --&gt;
+ 简介 我们经常需要把某种模式匹配到的所有路由，全都映射到同个组件。例如，我们有一个 User 组件，对于所有 ID 各不相同的用户，都要使用这个组件来渲染。那么，我们可以在 vue-router 的路由路径中使用“动态路径参数”(dynamic segment) 来达到这个效果：
++ 配置动态路由</code></pre><p>{<br>    path : “/mine/:id”, // 动态路由<br>    name : “mine” ,<br>    component: mine<br>}</p>
+<pre><code>使用的时候 会自动匹配1，2，3，4 到mine组件</code></pre><p><router-link to="/mine/1">跳转到mine页</router-link><br><router-link to="/mine/2">跳转到mine页</router-link><br><router-link to="/mine/3">跳转到mine页</router-link><br><router-link to="/mine/4">跳转到mine页</router-link><br><router-link :to="{name:'mine',params:{id:1}}">跳转到mine页</router-link><br>这里需要注意的一点就是 当路由是动态路由的时候我们得用命名路由的方式跳转</p>
+<pre><code>
++ query传值
+
+直接在路由后面传递需要传递的参数
+获取这个参数 可以使用 this.$route.query $route 当前路由对象</code></pre><p><router-link to="/user?username='张三'&age='40'&sex='男'" tag="h2">跳转到user页</router-link></p>
+<pre><code>### 嵌套路由 
+&gt; 简介 实际生活中的应用界面，通常由多层嵌套的组件组合而成。同样地，URL 中各：
+```段动态路径也按某种结构对应嵌套的各层组件，例如
+
+/user/profile                     /user/posts
++------------------+                  +-----------------+
+| User             |                  | User            |
+| +--------------+ |                  | +-------------+ |
+| | Profile      | |  +------------&gt;  | | Posts       | |
+| |              | |                  | |             | |
+| +--------------+ |                  | +-------------+ |
++------------------+                  +-----------------+</code></pre><blockquote>
 <p>嵌套路由的写法</p>
 </blockquote>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">const router &#x3D; new VueRouter(&#123;</span><br><span class="line">  routes: [</span><br><span class="line">    &#123; path: &#39;&#x2F;user&#39;, component: User,redirect:&quot;&#x2F;user&#x2F;profile&quot;</span><br><span class="line">      children: [</span><br><span class="line">        &#123;</span><br><span class="line">          &#x2F;&#x2F; 当 &#x2F;user&#x2F;profile 匹配成功，</span><br><span class="line">          &#x2F;&#x2F; UserProfile 会被渲染在 User 的 &lt;router-view&gt; 中</span><br><span class="line">          path: &#39;profile&#39;,</span><br><span class="line">          component: UserProfile</span><br><span class="line">        &#125;,</span><br><span class="line">        &#123;</span><br><span class="line">          &#x2F;&#x2F; 当 &#x2F;user&#x2F;posts 匹配成功</span><br><span class="line">          &#x2F;&#x2F; UserPosts 会被渲染在 User 的 &lt;router-view&gt; 中</span><br><span class="line">          path: &#39;posts&#39;,</span><br><span class="line">          component: UserPosts</span><br><span class="line">        &#125;</span><br><span class="line">      ]</span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
-<h3 id="编程式的导航-除了使用-创建-a-标签来定义导航链接-我们还可以用js的方法跳转页面"><a href="#编程式的导航-除了使用-创建-a-标签来定义导航链接-我们还可以用js的方法跳转页面" class="headerlink" title="编程式的导航 除了使用  创建 a 标签来定义导航链接 我们还可以用js的方法跳转页面"></a>编程式的导航 除了使用 <router-link> 创建 a 标签来定义导航链接 我们还可以用js的方法跳转页面</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; 字符串</span><br><span class="line">router.push(&#39;home&#39;)</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; 对象</span><br><span class="line">router.push(&#123; path: &#39;home&#39; &#125;)</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; 命名的路由</span><br><span class="line">router.push(&#123; name: &#39;user&#39;, params: &#123; userId: &#39;123&#39; &#125;&#125;)</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; 带查询参数，变成 &#x2F;register?plan&#x3D;private</span><br><span class="line">router.push(&#123; path: &#39;register&#39;, query: &#123; plan: &#39;private&#39; &#125;&#125;)</span><br></pre></td></tr></table></figure>
+<pre><code>const router = new VueRouter({
+  routes: [
+    { path: &#39;/user&#39;, component: User,redirect:&quot;/user/profile&quot;
+      children: [
+        {
+          // 当 /user/profile 匹配成功，
+          // UserProfile 会被渲染在 User 的 &lt;router-view&gt; 中
+          path: &#39;profile&#39;,
+          component: UserProfile
+        },
+        {
+          // 当 /user/posts 匹配成功
+          // UserPosts 会被渲染在 User 的 &lt;router-view&gt; 中
+          path: &#39;posts&#39;,
+          component: UserPosts
+        }
+      ]
+    }
+  ]
+})</code></pre><h3 id="编程式的导航-除了使用-创建-a-标签来定义导航链接-我们还可以用js的方法跳转页面"><a href="#编程式的导航-除了使用-创建-a-标签来定义导航链接-我们还可以用js的方法跳转页面" class="headerlink" title="编程式的导航 除了使用  创建 a 标签来定义导航链接 我们还可以用js的方法跳转页面"></a>编程式的导航 除了使用 <router-link> 创建 a 标签来定义导航链接 我们还可以用js的方法跳转页面</h3><pre><code>// 字符串
+router.push(&#39;home&#39;)
 
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; 在浏览器记录中前进一步，等同于 history.forward()</span><br><span class="line">router.go(1)</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; 后退一步记录，等同于 history.back()</span><br><span class="line">router.go(-1)</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; 前进 3 步记录</span><br><span class="line">router.go(3)</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; 如果 history 记录不够用，那就默默地失败呗</span><br><span class="line">router.go(-100)</span><br><span class="line">router.go(100)</span><br></pre></td></tr></table></figure>
-<h3 id="命名路由"><a href="#命名路由" class="headerlink" title="命名路由"></a>命名路由</h3><blockquote>
+// 对象
+router.push({ path: &#39;home&#39; })
+
+// 命名的路由
+router.push({ name: &#39;user&#39;, params: { userId: &#39;123&#39; }})
+
+// 带查询参数，变成 /register?plan=private
+router.push({ path: &#39;register&#39;, query: { plan: &#39;private&#39; }})</code></pre><pre><code>// 在浏览器记录中前进一步，等同于 history.forward()
+router.go(1)
+
+// 后退一步记录，等同于 history.back()
+router.go(-1)
+
+// 前进 3 步记录
+router.go(3)
+
+// 如果 history 记录不够用，那就默默地失败呗
+router.go(-100)
+router.go(100)</code></pre><h3 id="命名路由"><a href="#命名路由" class="headerlink" title="命名路由"></a>命名路由</h3><blockquote>
 <p>简介<br>有时候，通过一个名称来标识一个路由显得更方便一些，特别是在链接一个路由，或者是执行一些跳转的时候。可以在创建 Router 实例的时候，在 routes 配置中给某个路由设置名称。</p>
 </blockquote>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">const router &#x3D; new VueRouter(&#123;</span><br><span class="line">  routes: [</span><br><span class="line">    &#123;</span><br><span class="line">      path: &#39;&#x2F;user&#x2F;:userId&#39;,</span><br><span class="line">      name: &#39;user&#39;,</span><br><span class="line">      component: User</span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;)</span><br><span class="line">要链接到一个命名路由，可以给 router-link 的 to 属性传一个对象：</span><br><span class="line">&lt;router-link :to&#x3D;&quot;&#123; name: &#39;user&#39;, params: &#123; userId: 123 &#125;&#125;&quot;&gt;User&lt;&#x2F;router-link&gt;</span><br><span class="line">router.push(&#123; name: &#39;user&#39;, params: &#123; userId: 123 &#125;&#125;)</span><br></pre></td></tr></table></figure>
-<h3 id="重定向"><a href="#重定向" class="headerlink" title="重定向"></a>重定向</h3><blockquote>
+<pre><code>const router = new VueRouter({
+  routes: [
+    {
+      path: &#39;/user/:userId&#39;,
+      name: &#39;user&#39;,
+      component: User
+    }
+  ]
+})
+要链接到一个命名路由，可以给 router-link 的 to 属性传一个对象：
+&lt;router-link :to=&quot;{ name: &#39;user&#39;, params: { userId: 123 }}&quot;&gt;User&lt;/router-link&gt;
+router.push({ name: &#39;user&#39;, params: { userId: 123 }})</code></pre><h3 id="重定向"><a href="#重定向" class="headerlink" title="重定向"></a>重定向</h3><blockquote>
 <p>重定向  把地址重定向到某个路由 重定向”的意思是，当用户访问 /a时，URL 将会被替换成 /b，然后匹配路由为 /b</p>
 </blockquote>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">const router &#x3D; new VueRouter(&#123;</span><br><span class="line">  routes: [</span><br><span class="line">    &#123; path: &#39;&#x2F;a&#39;, redirect: &#39;&#x2F;b&#39; &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
-<h3 id="html5-History模式"><a href="#html5-History模式" class="headerlink" title="html5 History模式"></a>html5 History模式</h3><blockquote>
+<pre><code>const router = new VueRouter({
+  routes: [
+    { path: &#39;/a&#39;, redirect: &#39;/b&#39; }
+  ]
+})</code></pre><h3 id="html5-History模式"><a href="#html5-History模式" class="headerlink" title="html5 History模式"></a>html5 History模式</h3><blockquote>
 <p>简介<br>vue-router 默认 hash 模式(特点 #/) —— 使用 URL 的 hash 来模拟一个完整的 URL，于是当 URL 改变时，页面不会重新加载。</p>
 </blockquote>
 <p>如果不想要很丑的 hash，我们可以用路由的 history 模式，这种模式充分利用 history.pushState API 来完成 URL 跳转而无须重新加载页面。<br>当使用 history 模式时，URL 就像正常的 url，例如 <a href="http://yoursite.com/user/id，也好看！">http://yoursite.com/user/id，也好看！</a><br>不过这种模式要玩好，还需要后台配置支持。因为我们的应用是个单页客户端应用，如果后台没有正确的配置，当用户在浏览器直接访问 <a href="http://oursite.com/user/id" target="_blank" rel="noopener">http://oursite.com/user/id</a> 就会返回 404。</p>
@@ -619,7 +679,7 @@ home -->
     let gitalk = new Gitalk({
         clientID: '8c9b77e4c087dbfd7d5b',
         clientSecret: '4785f2b3d1af1d454c9df958719d5b084229b7b9',
-        repo: 'todoit.top',
+        repo: 'moYuWei123.github.io',
         owner: '半岛铁盒',
         admin: "半岛铁盒",
         id: '2018-06-14T11-24-43',
@@ -881,6 +941,9 @@ home -->
             |&nbsp;Powered by&nbsp;<a href="https://hexo.io/" target="_blank">Hexo</a>
             |&nbsp;Theme&nbsp;<a href="https://github.com/blinkfox/hexo-theme-matery" target="_blank">Matery</a>
             <br>
+            
+            &nbsp;<i class="fas fa-chart-area"></i>&nbsp;站点总字数:&nbsp;<span
+                class="white-color">22.8k</span>&nbsp;字
             
             
             
