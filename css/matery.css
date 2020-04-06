@@ -1,5 +1,12 @@
 /*全局基础样式*/
 /*小屏幕下(手机类)的样式*/
+::-webkit-scrollbar {
+  display: none; /* Chrome Safari */
+}
+/* html,
+body{
+	background-image: linear-gradient(120deg, #fdfbfb 0%, #ebedee 100%);
+} */
 @media only screen and (max-width: 601px) {
 	.container {
 		width: 95%;
@@ -243,6 +250,7 @@ mark {
 
 .card {
 	border-radius: 10px;
+	overflow: hidden;
 	box-shadow: 0 15px 35px rgba(50, 50, 93, .1), 0 5px 15px rgba(0, 0, 0, .07) !important;
 }
 
@@ -257,7 +265,7 @@ mark {
 }
 
 .bg-color {
-	/* background-image: linear-gradient(to right, #eea2a2 0%, #bbc1bf 19%, #57c6e1 42%, #b49fda 79%, #7ac5d8 100%); */
+	 /* background-image: linear-gradient(to right, #eea2a2 0%, #bbc1bf 19%, #57c6e1 42%, #b49fda 79%, #7ac5d8 100%); */
 	background-color: rgba(2,2,2,.5);
 }
 
@@ -1856,8 +1864,11 @@ footer .copy-right {
 }
 
 #searchModal {
+	background-image: linear-gradient(-20deg, #e9defa 0%, #fbfcdb 100%);
 	min-height: 500px;
 	width: 80%;
+	transition: all .5s;
+	border-radius: 10px;
 }
 
 #searchModal .search-header .title {
