@@ -856,7 +856,7 @@ created <span class="token punctuation">(</span><span class="token punctuation">
 <span class="token punctuation">}</span>
 <span class="token punctuation">}</span>
 </span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>script</span><span class="token punctuation">></span></span></code></pre>
-<img src="https://ss1.bdstatic.com/70cFuXSh_Q1YnxGkpoWK1HF6hhy/it/u=1648529271,890206460&fm=26&gp=0.jpg" data-original="./imgs/img1.jpg" alt="请求结果" title="请求结果"><ul>
+<img src="./imgs/img1.jpg" alt="请求结果" title="请求结果"><ul>
 <li>get请求附带参数<pre class=" language-html"><code class="language-html"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>script</span><span class="token punctuation">></span></span><span class="token script language-javascript">
 <span class="token keyword">import</span> axios <span class="token keyword">from</span> <span class="token string">"axios"</span><span class="token punctuation">;</span>
 <span class="token keyword">export</span> <span class="token keyword">default</span> <span class="token punctuation">{</span>
@@ -883,7 +883,7 @@ created <span class="token punctuation">(</span><span class="token punctuation">
 <span class="token punctuation">}</span>
 <span class="token punctuation">}</span>
 </span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>script</span><span class="token punctuation">></span></span></code></pre>
-<img src="https://ss1.bdstatic.com/70cFuXSh_Q1YnxGkpoWK1HF6hhy/it/u=1648529271,890206460&fm=26&gp=0.jpg" data-original="./imgs/img2.jpg" alt="请求结果" title="请求结果"></li>
+<img src="./imgs/img2.jpg" alt="请求结果" title="请求结果"></li>
 </ul>
 </li>
 </ul>
@@ -912,7 +912,7 @@ created <span class="token punctuation">(</span><span class="token punctuation">
 <span class="token punctuation">}</span>
 <span class="token punctuation">}</span>
 </span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>script</span><span class="token punctuation">></span></span></code></pre>
-<img src="https://ss1.bdstatic.com/70cFuXSh_Q1YnxGkpoWK1HF6hhy/it/u=1648529271,890206460&fm=26&gp=0.jpg" data-original="./imgs/img3.jpg" alt="post请求" title="post请求"><h3 id="post请求注意事项"><a href="#post请求注意事项" class="headerlink" title="post请求注意事项"></a>post请求注意事项</h3></li>
+<img src="./imgs/img3.jpg" alt="post请求" title="post请求"><h3 id="post请求注意事项"><a href="#post请求注意事项" class="headerlink" title="post请求注意事项"></a>post请求注意事项</h3></li>
 </ul>
 <p>axios 使用 post 发送数据时，默认是直接把传递的参数转换成 json 放到请求体中提交到后端的。也就是说，我们的 Content-Type 变成了 application/json;charset=utf-8 ,这是axios默认的请求头content-type类型。但是实际我们后端要求的 ‘Content-Type’: ‘application/x-www-form-urlencoded’ 为多见，这就与我们不符合。<br>在HTTP协议消息头中，使用Content-Type来表示请求和响应中的媒体类型信息。它用来告诉服务端如何处理请求的数据，以及告诉客户端（一般是浏览器）如何解析响应的数据，比如显示图片，解析并展示html等等。<br><strong>post请求常见的数据格式（content-type）</strong></p>
 <ol>
@@ -1047,7 +1047,7 @@ axios<span class="token punctuation">.</span>defaults<span class="token punctuat
 <ul>
 <li><code>axios.defaults.headers.common[&#39;token&#39;] = token</code>;<br>token是登陆的时候返回的token 如果后端让在别的页面请求数据的是附带token<br>一般用户判断用户是否登陆是根据token 进行判断的  一般把这个token存在session里面<br>只要把toke写在请求头里面 后端就知道我们登陆<br><code>axios.defaults.headers.common[&#39;token&#39;] = localStorage[&quot;token&quot;]</code><br>登陆的时候保存sessionkey  然后在请求其他接口的时候带上这个sessionkey  sessionkey  代表用户的身份 当我们请求数据的时候带上这个sessionkey  那么后端就知道现在是谁在请求数据<br>还有些特殊的情况 登陆的时候后端会在本地设置cookie token 他会根据cookie里面的值token来判断用户是否登陆  </li>
 </ul>
-<p>axios.defaults.headers.common[‘sessionKey’] = 登陆时后端返回的sessionKey<br>如果你每次请求接口需要验证，就加这个，不需要验证那就不用加<br><img src="https://ss1.bdstatic.com/70cFuXSh_Q1YnxGkpoWK1HF6hhy/it/u=1648529271,890206460&fm=26&gp=0.jpg" data-original="./imgs/session.jpg" alt="用户身份鉴权" title="用户身份鉴权"></p>
+<p>axios.defaults.headers.common[‘sessionKey’] = 登陆时后端返回的sessionKey<br>如果你每次请求接口需要验证，就加这个，不需要验证那就不用加<br><img src="./imgs/session.jpg" alt="用户身份鉴权" title="用户身份鉴权"></p>
 <pre class=" language-html"><code class="language-html">
 <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>template</span><span class="token punctuation">></span></span>
   <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>div</span> <span class="token attr-name">class</span><span class="token attr-value"><span class="token punctuation">=</span><span class="token punctuation">"</span>home<span class="token punctuation">"</span></span><span class="token punctuation">></span></span>
