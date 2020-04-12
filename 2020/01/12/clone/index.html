@@ -4,7 +4,7 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="keywords" content="vuex高级, 半岛铁盒个人博客 , 前端 , 半岛铁盒博客">
+    <meta name="keywords" content="浅克隆与深克隆, 半岛铁盒个人博客 , 前端 , 半岛铁盒博客">
     <meta name="description" content="个人博客">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
@@ -16,7 +16,7 @@
     <!-- Global site tag (gtag.js) - Google Analytics -->
 
 
-    <title>vuex高级 | 半岛铁盒</title>
+    <title>浅克隆与深克隆 | 半岛铁盒</title>
     <link rel="icon" type="image/jpeg" href="https://dss1.bdstatic.com/70cFuXSh_Q1YnxGkpoWK1HF6hhy/it/u=2471723103,4261647594&fm=26&gp=0.jpg">
 
     <link rel="stylesheet" type="text/css" href="/libs/awesome/css/all.css">
@@ -620,12 +620,12 @@
 
 
 
-<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/1.jpg')">
+<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/10.jpg')">
     <div class="container" style="right: 0px;left: 0px;">
         <div class="row">
             <div class="col s12 m12 l12">
                 <div class="brand">
-                    <h1 class="description center-align post-title">vuex高级</h1>
+                    <h1 class="description center-align post-title">浅克隆与深克隆</h1>
                 </div>
             </div>
         </div>
@@ -750,8 +750,12 @@
                     
                     <div class="article-tag">
                         
-                            <a href="/tags/vue%E5%9F%BA%E7%A1%80/">
-                                <span class="chip bg-color">vue基础</span>
+                            <a href="/tags/js%E4%B8%AD%E7%BA%A7/">
+                                <span class="chip bg-color">js中级</span>
+                            </a>
+                        
+                            <a href="/tags/JavaScript/">
+                                <span class="chip bg-color">JavaScript</span>
                             </a>
                         
                     </div>
@@ -762,8 +766,8 @@
                     <div class="post-cate">
                         <i class="fas fa-bookmark fa-fw icon-category"></i>
                         
-                            <a href="/categories/Vue/" class="post-category">
-                                Vue
+                            <a href="/categories/JavaScript/" class="post-category">
+                                JavaScript
                             </a>
                         
                     </div>
@@ -775,7 +779,7 @@
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-minus fa-fw"></i>发布日期:&nbsp;&nbsp;
-                    2018-11-19
+                    2020-01-12
                 </div>
                 
 
@@ -784,7 +788,7 @@
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    1.3k
+                    222
                 </div>
                 
 
@@ -797,192 +801,78 @@
         <hr class="clearfix">
         <div class="card-content article-card-content">
             <div id="articleContent">
-                <h2 id="vuex辅助函数-帮助我们节省代码的语法糖"><a href="#vuex辅助函数-帮助我们节省代码的语法糖" class="headerlink" title="vuex辅助函数 帮助我们节省代码的语法糖"></a>vuex辅助函数 帮助我们节省代码的语法糖</h2><ol>
-<li>mapState  –  当一个组件需要获取多个状态时候，将这些状态都声明为计算属性会有些重复和冗余。为了解决这个问题，我们可以使用 mapState 辅助函数帮助我们生成计算属性，让你少按几次键。(其实就是我们在vuex里面定义的变量  接收的时候还要再定义变量去接收 很麻烦 vuex辅助函数呢 可以帮我们解决这种麻烦)</li>
-<li>mapGetters – 将store中的多个getter映射到局部组件的计算属性中</li>
-<li>mapMutations 将组件中的 methods 映射为 store.commit 调用。</li>
-<li>mapActions 将组件的 methods 映射为 store.dispatch 调用</li>
-</ol>
-<h3 id="mapState-的三种种写法"><a href="#mapState-的三种种写法" class="headerlink" title="mapState 的三种种写法"></a>mapState 的三种种写法</h3><pre><code>export default {
-  name: &#39;home&#39;,
-  components: {
-    HelloWorld
-  },
-  data () {
-    return {
-      username:&quot;用户名&quot;
-    }
-  },
-  computed: {
-    ...mapState({
-      age:state =&gt; state.age,  // 第一种  箭头函数 
-      num:&quot;num&quot;,  // 传字符串参数 &#39;num&#39; 等同于 `state =&gt; state.num`
-      name (state) {  // 第三种呢 等同于第一种  只不过第三种可以使用this 方便vuex里面的数据结合本地的数据
-        return this.username + state.name ;
-      }
-    })
-  }
-}</code></pre><h3 id="mapGetters-getters的辅助函数"><a href="#mapGetters-getters的辅助函数" class="headerlink" title="mapGetters  getters的辅助函数"></a>mapGetters  getters的辅助函数</h3><pre><code>import HelloWorld from &#39;@/components/HelloWorld.vue&#39;
-import { mapState , mapGetters , mapMutations , mapActions } from &quot;vuex&quot;
-export default {
-  name: &#39;home&#39;,
-  components: {
-    HelloWorld
-  },
-  data () {
-    return {
-      username:&quot;用户名&quot;
-    }
-  },
-  computed: {
-    ...mapState({
-      num:&quot;num&quot;,
-      age:state =&gt; state.age,
-      name (state) {
-        return this.username + state.name ;
-      }
-    }),
-    ...mapGetters({
-      price:&quot;price&quot;
-    })
-  }
-}</code></pre><h3 id="mapMutations-mutations的辅助函数的两种写法"><a href="#mapMutations-mutations的辅助函数的两种写法" class="headerlink" title="mapMutations mutations的辅助函数的两种写法"></a>mapMutations mutations的辅助函数的两种写法</h3><pre><code>methods: {
-    ...mapMutations([     // 第一种
-      &quot;add&quot;,  // 调用的时候执行this.add()  映射为 `this.$store.commit(&#39;add&#39;)`
-      &quot;adds&quot;  // 如果需要提交载荷  直接调用 this.adds(num ) 映射为 `this.$store.commit(&#39;adds&#39;, num)`
-    ]),
-    ...mapMutations({
-      add: &#39;add&#39; // 将 `this.add()` 映射为 `this.$store.commit(&#39;add&#39;)` 
-    })
-  }</code></pre><h3 id="mapActions-actions的辅助函数"><a href="#mapActions-actions的辅助函数" class="headerlink" title="mapActions  actions的辅助函数"></a>mapActions  actions的辅助函数</h3><pre><code> methods: {
-    ...mapActions([
-      &#39;increment&#39;, // 将 `this.increment()` 映射为 `this.$store.dispatch(&#39;increment&#39;)`
+                <h2 id="浅克隆"><a href="#浅克隆" class="headerlink" title="浅克隆"></a>浅克隆</h2><ul>
+<li><p>浅克隆的对象的引用值是拷贝对象里的引用，这两个对象里面的引用（如对象里的数组或者内嵌对象）指向的地方是一致的。</p>
+<pre class=" language-html"><code class="language-html"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>script</span> <span class="token attr-name">type</span><span class="token attr-value"><span class="token punctuation">=</span><span class="token punctuation">"</span>text/javascript<span class="token punctuation">"</span></span><span class="token punctuation">></span></span><span class="token script language-javascript">
+          <span class="token keyword">var</span> obj1 <span class="token operator">=</span> <span class="token punctuation">{</span>
+              name<span class="token punctuation">:</span><span class="token string">'张三'</span><span class="token punctuation">,</span>
+              age<span class="token punctuation">:</span><span class="token number">20</span><span class="token punctuation">,</span>
+              arr<span class="token punctuation">:</span><span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">,</span><span class="token number">3</span><span class="token punctuation">,</span><span class="token number">4</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+              say<span class="token punctuation">:</span><span class="token keyword">function</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">{</span>
+                  <span class="token function">alert</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>name<span class="token punctuation">)</span>
+              <span class="token punctuation">}</span>
+          <span class="token punctuation">}</span>
 
-      // `mapActions` 也支持载荷：
-      &#39;incrementBy&#39; // 将 `this.incrementBy(amount)` 映射为 `this.$store.dispatch(&#39;incrementBy&#39;, amount)`
-    ]),
-    ...mapActions({
-      add: &#39;increment&#39; // 将 `this.add()` 映射为 `this.$store.dispatch(&#39;increment&#39;)`
-    })
-  }</code></pre><h2 id="Module-vuex模块化"><a href="#Module-vuex模块化" class="headerlink" title="Module  vuex模块化"></a>Module  vuex模块化</h2><h3 id="vuex官方解释-由于使用单一状态树，应用的所有状态会集中到一个比较大的对象。当应用变得非常复杂时，store-对象就有可能变得相当臃肿。为了解决以上问题，Vuex-允许我们将-store-分割成模块（module）。每个模块拥有自己的-state、mutation、action、getter、甚至是嵌套子模块——从上至下进行同样方式的分割："><a href="#vuex官方解释-由于使用单一状态树，应用的所有状态会集中到一个比较大的对象。当应用变得非常复杂时，store-对象就有可能变得相当臃肿。为了解决以上问题，Vuex-允许我们将-store-分割成模块（module）。每个模块拥有自己的-state、mutation、action、getter、甚至是嵌套子模块——从上至下进行同样方式的分割：" class="headerlink" title="vuex官方解释 由于使用单一状态树，应用的所有状态会集中到一个比较大的对象。当应用变得非常复杂时，store 对象就有可能变得相当臃肿。为了解决以上问题，Vuex 允许我们将 store 分割成模块（module）。每个模块拥有自己的 state、mutation、action、getter、甚至是嵌套子模块——从上至下进行同样方式的分割："></a>vuex官方解释 由于使用单一状态树，应用的所有状态会集中到一个比较大的对象。当应用变得非常复杂时，store 对象就有可能变得相当臃肿。为了解决以上问题，Vuex 允许我们将 store 分割成模块（module）。每个模块拥有自己的 state、mutation、action、getter、甚至是嵌套子模块——从上至下进行同样方式的分割：</h3><h3 id="通俗点的说法就是-当我们写大型的项目的时候-我们所有的需要共享的信息或状态都写在同一个state里面-导致state或其他的操作比较臃肿-那么-为了解决这个问题-vuex提出了模块化-module"><a href="#通俗点的说法就是-当我们写大型的项目的时候-我们所有的需要共享的信息或状态都写在同一个state里面-导致state或其他的操作比较臃肿-那么-为了解决这个问题-vuex提出了模块化-module" class="headerlink" title="通俗点的说法就是 当我们写大型的项目的时候  我们所有的需要共享的信息或状态都写在同一个state里面  导致state或其他的操作比较臃肿 那么 为了解决这个问题 vuex提出了模块化  module"></a>通俗点的说法就是 当我们写大型的项目的时候  我们所有的需要共享的信息或状态都写在同一个state里面  导致state或其他的操作比较臃肿 那么 为了解决这个问题 vuex提出了模块化  module</h3><p>下面呢 是我们模块化的写法 在main.js的同级新建一个store文件夹 在这个store文件夹新建一个index.js 里面写上一下内容 </p>
-<pre><code>
-import Vue from &#39;vue&#39;
-import Vuex from &#39;vuex&#39;
+          <span class="token keyword">function</span> <span class="token function">clone</span><span class="token punctuation">(</span>obj<span class="token punctuation">)</span><span class="token punctuation">{</span>
+              <span class="token keyword">var</span> newobj <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+              <span class="token keyword">for</span><span class="token punctuation">(</span><span class="token keyword">var</span> key <span class="token keyword">in</span> obj<span class="token punctuation">)</span><span class="token punctuation">{</span>
+                  newobj<span class="token punctuation">[</span>key<span class="token punctuation">]</span> <span class="token operator">=</span> obj<span class="token punctuation">[</span>key<span class="token punctuation">]</span>
+              <span class="token punctuation">}</span>
+              <span class="token keyword">return</span> newobj
+          <span class="token punctuation">}</span>
 
-Vue.use(Vuex)
-
-import moduleA from &quot;./modules/moduleA&quot;
-import moduleB from &quot;./modules/moduleB&quot;
-export default new Vuex.Store({
-  modules: {
-    a: moduleA,   
-    b: moduleB
-  }
-})</code></pre><p>在index.js的同级新建一个modules的文件夹 这个文件夹分别有两个js 分别为 moduleA 和 moduleB 内容分别为以下内容 再在main.js里面引入index.js 这个模块化的写法就已经完成 </p>
-<pre><code>
-const moduleA = {   // moduleA
-    state: { num:1 },
-    mutations: {  
-        addNum(state){
-            state.num += 2  // 调用的时候执行 this.$store.commit(&#39;addNum&#39;)
-        }
-    },
-    actions: { 
-        syncAddNum(context,val){
-            context.commit(&quot;addNum&quot;,val) // 调用的时候执行 this.$store.dispatch(&#39;syncAddNum&#39;)
-        }
-    },
-    getters: { 
-        addNums(state){
-            return state.num + &quot;元 &quot;  // 调用的时候执行 this.$store.getters.addNums
-        }
-    }
-}
-export default moduleA
-
-const moduleB = {
-    state: { num:2 },
-    mutations: { 
-        addNum(state){
-            state.num += 3
-        }
-     },
-    actions: {  },
-
-  }
-export default moduleB</code></pre><h3 id="模块化注意点"><a href="#模块化注意点" class="headerlink" title="模块化注意点"></a>模块化注意点</h3><ol>
-<li>对于上面的模块化的写法  只有state是模块化的 其他的诸如 getters mutations actions不是模块化 </li>
-<li>如果想实现getters mutations actions实现模块化 那么 得在每个模块的js里面加入 <strong>*命名空间 *</strong><br><code>namespaced: true,</code> </li>
-<li>启用命名空间之后 获取getters mutations actions的写法都要变 </li>
-</ol>
-<pre><code>
-const moduleA = {   // moduleA
-    namespaced: true,
-    state: { num:1 },
-    mutations: {  
-        addNum(state){
-            state.num += 2  // 调用的时候执行 this.$store.commit(&#39;a/addNum&#39;,3)
-        }
-    },
-    actions: { 
-        syncAddNum(context,val){
-            context.commit(&quot;addNum&quot;,val)  // 调用的时候执行 this.$store.dispatch(&#39;a/syncAddNum&#39;,3)
-        }
-    },
-    getters: { 
-        addNums(state){
-            return state.num + &quot;元 &quot;  // 调用的时候执行 this.$store.getters[&#39;a/addNum2&#39;]
-        }
-    }
-}
-export default moduleA
-
-const moduleB = {
-    namespaced: true,
-    state: { num:2 },
-    mutations: { 
-        addNum(state){
-            state.num += 3
-        }
-     },
-    actions: {  },
-
-  }
-export default moduleB</code></pre><ol start="4">
-<li>启用命名空间后辅助函数 mapState mapGetters mapMutations mapActions 的写法</li>
-</ol>
-<ul>
-<li>启用命名空间后的mapState的写法 <pre><code>...mapState({
- a1: state =&gt; state.b.num,  
-}),</code></pre></li>
-<li>启用命名空间后的mapGetters的写法 <pre><code>...mapGetters({
- a2: &quot;b/addNum1&quot;
-}),</code></pre></li>
-<li>启用命名空间后的mapMutations的写法 <pre><code>...mapMutations({event : &quot;b/addNum&quot;})  // this.event(3) 附带参数的写法 </code></pre></li>
-<li>启用命名空间后的mapActions的写法 <pre><code>...mapActions({events : &quot;b/syncAddNum&quot;}),  // this.events(4) 附带参数的写法 </code></pre></li>
+          <span class="token keyword">var</span> obj2 <span class="token operator">=</span> <span class="token function">clone</span><span class="token punctuation">(</span>obj1<span class="token punctuation">)</span>
+          console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span>obj1<span class="token punctuation">)</span>
+          console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span>obj2<span class="token punctuation">)</span>
+          console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span>obj1 <span class="token operator">==</span> obj2<span class="token punctuation">)</span>
+          obj2<span class="token punctuation">.</span><span class="token function">say</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+      </span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>script</span><span class="token punctuation">></span></span></code></pre>
+</li>
 </ul>
-<h3 id="监听路由变化执行动画效果"><a href="#监听路由变化执行动画效果" class="headerlink" title="监听路由变化执行动画效果"></a>监听路由变化执行动画效果</h3><pre class=" language-html"><code class="language-html"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>script</span><span class="token punctuation">></span></span><span class="token script language-javascript">
-  watch<span class="token punctuation">:</span> <span class="token punctuation">{</span>
-    <span class="token string">"$route"</span><span class="token punctuation">:</span><span class="token keyword">function</span> <span class="token punctuation">(</span>to<span class="token punctuation">,</span><span class="token keyword">from</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
-
-      <span class="token keyword">var</span> toPath  <span class="token operator">=</span> to<span class="token punctuation">.</span>fullPath<span class="token punctuation">.</span><span class="token function">split</span><span class="token punctuation">(</span><span class="token string">"/"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length<span class="token punctuation">;</span>
-      <span class="token keyword">var</span> fromPath  <span class="token operator">=</span> <span class="token keyword">from</span><span class="token punctuation">.</span>fullPath<span class="token punctuation">.</span><span class="token function">split</span><span class="token punctuation">(</span><span class="token string">"/"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length<span class="token punctuation">;</span>
-      console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">"toPath"</span><span class="token punctuation">,</span>toPath<span class="token punctuation">,</span><span class="token string">"fromPath"</span><span class="token punctuation">,</span>fromPath<span class="token punctuation">)</span><span class="token punctuation">;</span>
-      <span class="token keyword">if</span><span class="token punctuation">(</span>toPath<span class="token operator">></span>fromPath<span class="token punctuation">)</span> <span class="token punctuation">{</span> <span class="token comment" spellcheck="true">// 进入某个内页</span>
-        <span class="token keyword">this</span><span class="token punctuation">.</span>classname <span class="token operator">=</span> <span class="token string">"fadeInRight animated"</span>
-      <span class="token punctuation">}</span><span class="token keyword">else</span> <span class="token keyword">if</span><span class="token punctuation">(</span>toPath<span class="token operator">&lt;</span>fromPath<span class="token punctuation">)</span><span class="token punctuation">{</span> <span class="token comment" spellcheck="true">// 离开内页</span>
-        <span class="token keyword">this</span><span class="token punctuation">.</span>classname <span class="token operator">=</span> <span class="token string">"fadeInLeft animated"</span>
-      <span class="token punctuation">}</span><span class="token keyword">else</span><span class="token punctuation">{</span>
-        <span class="token keyword">this</span><span class="token punctuation">.</span>classname <span class="token operator">=</span> <span class="token string">"fadeIn animated"</span>
+<h2 id="深度克隆"><a href="#深度克隆" class="headerlink" title="深度克隆"></a>深度克隆</h2><ul>
+<li>这两个对象里的引用的独立拷贝的，不指向同一个地方。</li>
+</ul>
+<ol>
+<li>使用递归</li>
+</ol>
+<pre class=" language-javascript"><code class="language-javascript">      <span class="token comment" spellcheck="true">// 深度克隆</span>
+      <span class="token keyword">function</span> <span class="token function">deepClone</span><span class="token punctuation">(</span>object<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">var</span> obj <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>object <span class="token keyword">instanceof</span> <span class="token class-name">Array</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+          obj <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+        <span class="token punctuation">}</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> key <span class="token keyword">in</span> object<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+          obj<span class="token punctuation">[</span>key<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token keyword">typeof</span> object<span class="token punctuation">[</span>key<span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token string">"object"</span> <span class="token operator">?</span> <span class="token function">deepClone</span><span class="token punctuation">(</span>object<span class="token punctuation">[</span>key<span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">:</span> object<span class="token punctuation">[</span>key<span class="token punctuation">]</span>
+        <span class="token punctuation">}</span>
+        <span class="token keyword">return</span> obj
+      <span class="token punctuation">}</span></code></pre>
+<ol start="2">
+<li>json克隆</li>
+</ol>
+<pre class=" language-javascript"><code class="language-javascript"><span class="token keyword">var</span> user <span class="token operator">=</span> <span class="token punctuation">{</span>
+        name<span class="token punctuation">:</span> <span class="token string">"张三"</span><span class="token punctuation">,</span>
+        age<span class="token punctuation">:</span> <span class="token string">"80"</span><span class="token punctuation">,</span>
+        arr<span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">"3"</span><span class="token punctuation">,</span> <span class="token string">"6"</span><span class="token punctuation">,</span> <span class="token string">"9"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        say<span class="token punctuation">:</span> <span class="token keyword">function</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+          console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span>say<span class="token punctuation">)</span>
+        <span class="token punctuation">}</span>
       <span class="token punctuation">}</span>
-      <span class="token comment" spellcheck="true">// if(to.name == "info"){</span>
-      <span class="token comment" spellcheck="true">//   this.classname = "fadeInRight  animated"</span>
-      <span class="token comment" spellcheck="true">// }else{</span>
-      <span class="token comment" spellcheck="true">//   this.classname = "fadeInLeft  animated"</span>
-      <span class="token comment" spellcheck="true">// }</span>
-    <span class="token punctuation">}</span>
-  <span class="token punctuation">}</span>
-</span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>script</span><span class="token punctuation">></span></span></code></pre>
+
+       <span class="token keyword">var</span> json_obj <span class="token operator">=</span> JSON<span class="token punctuation">.</span><span class="token function">parse</span><span class="token punctuation">(</span>JSON<span class="token punctuation">.</span><span class="token function">stringify</span><span class="token punctuation">(</span>user<span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre>
+<ol start="3">
+<li>使用lodash</li>
+</ol>
+<pre class=" language-javascript"><code class="language-javascript"><span class="token keyword">var</span> user <span class="token operator">=</span> <span class="token punctuation">{</span>
+        name<span class="token punctuation">:</span> <span class="token string">"张三"</span><span class="token punctuation">,</span>
+        age<span class="token punctuation">:</span> <span class="token string">"80"</span><span class="token punctuation">,</span>
+        arr<span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">"3"</span><span class="token punctuation">,</span> <span class="token string">"6"</span><span class="token punctuation">,</span> <span class="token string">"9"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        say<span class="token punctuation">:</span> <span class="token keyword">function</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+          console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span>say<span class="token punctuation">)</span>
+        <span class="token punctuation">}</span>
+      <span class="token punctuation">}</span>
+
+<span class="token keyword">var</span> user2<span class="token operator">=</span>_<span class="token punctuation">.</span><span class="token function">cloneDeep</span><span class="token punctuation">(</span>user<span class="token punctuation">)</span></code></pre>
 
             </div>
             <hr/>
@@ -1008,7 +898,7 @@ export default moduleB</code></pre><ol start="4">
                     </i>
                 </span>
                 <span class="reprint-info">
-                    <a href="https://todoit.top/2018/11/19/vuex-gao-ji/">https://todoit.top/2018/11/19/vuex-gao-ji/</a>
+                    <a href="https://todoit.top/2020/01/12/clone/">https://todoit.top/2020/01/12/clone/</a>
                 </span>
             </div>
             <div class="reprint__notice">
@@ -1046,8 +936,12 @@ export default moduleB</code></pre><ol start="4">
                     
                         <div class="article-tag">
                             
-                                <a href="/tags/vue%E5%9F%BA%E7%A1%80/">
-                                    <span class="chip bg-color">vue基础</span>
+                                <a href="/tags/js%E4%B8%AD%E7%BA%A7/">
+                                    <span class="chip bg-color">js中级</span>
+                                </a>
+                            
+                                <a href="/tags/JavaScript/">
+                                    <span class="chip bg-color">JavaScript</span>
                                 </a>
                             
                         </div>
@@ -1114,33 +1008,31 @@ export default moduleB</code></pre><ol start="4">
             <div class="article-badge left-badge text-color">
                 <i class="fas fa-chevron-left"></i>&nbsp;上一篇</div>
             <div class="card">
-                <a href="/2019/02/28/webpack/">
+                <a href="/2020/04/04/zhi-jing-ying-xiong/">
                     <div class="card-image">
                         
-                        <img src="https://timgsa.baidu.com/timg?image&amp;quality=80&amp;size=b9999_10000&amp;sec=1585860896772&amp;di=fcd9ec31e0468307efc8dd971460061d&amp;imgtype=0&amp;src=http%3A%2F%2Fstatic001.geekbang.org%2Fresource%2Fimage%2Ff9%2F04%2Ff909858b9ce8d2393f2488d272b03b04.jpg" class="responsive-img" alt="webpack">
+                        <img src="https://ss1.bdstatic.com/70cFvXSh_Q1YnxGkpoWK1HF6hhy/it/u=4161546023,2044808232&amp;fm=11&amp;gp=0.jpg" class="responsive-img" alt="致敬英雄">
                         
-                        <span class="card-title">webpack</span>
+                        <span class="card-title">致敬英雄</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
                     <div class="summary block-with-text">
                         
-                            webpackimport 默认只能导入js文件 不能导入图片 css等 但vue-cli的项目可以导入 其中 做的处理就是webpack 通过webpack 可以打包图片等
-传统开发的缺点传统开发的缺点
-
-js脚本的执行依赖于外部扩展库(
+                            致敬英雄  今天是2020年4月4日清明节，2020发生了很多不好的事情，但是一切终会过去，生活依然美好
+  疾病与灾难都会成为岁月的尘埃。总会有一天，这里没有歇斯底里的哭喊，没有绝望与黑暗，春风会吹开这里的樱花，疾病肆虐过的冰冷土地下，是
                         
                     </div>
                     <div class="publish-info">
                         <span class="publish-date">
-                            <i class="far fa-clock fa-fw icon-date"></i>2019-02-28
+                            <i class="far fa-clock fa-fw icon-date"></i>2020-04-04
                         </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
                             
-                            <a href="/categories/webpack/" class="post-category">
-                                    webpack
+                            <a href="/categories/%E8%AE%B0%E5%BD%95/" class="post-category">
+                                    记录
                                 </a>
                             
                             
@@ -1150,8 +1042,8 @@ js脚本的执行依赖于外部扩展库(
                 
                 <div class="card-action article-tags">
                     
-                    <a href="/tags/webpack%E6%89%93%E5%8C%85/">
-                        <span class="chip bg-color">webpack打包</span>
+                    <a href="/tags/2020/">
+                        <span class="chip bg-color">2020</span>
                     </a>
                     
                 </div>
@@ -1165,32 +1057,36 @@ js脚本的执行依赖于外部扩展库(
                 下一篇&nbsp;<i class="fas fa-chevron-right"></i>
             </div>
             <div class="card">
-                <a href="/2018/10/11/vuex/">
+                <a href="/2020/01/12/chuang-jian-dui-xiang-ji-chong-fang-shi/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/0.jpg" class="responsive-img" alt="vuex">
+                        <img src="/medias/featureimages/2.jpg" class="responsive-img" alt="创建对象几种方式">
                         
-                        <span class="card-title">vuex</span>
+                        <span class="card-title">创建对象几种方式</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
                     <div class="summary block-with-text">
                         
-                            vue进阶vuex初始
-vuex定义  vuex是一个状态管理的插件，可以解决不同组件之间的数据共享和数据持久化。通俗点的说法就是全局的数据仓库，在组件里面的data是组件里的数据仓库也就是局部的数据仓库，全局数据仓库里面的数据可以在任意组
+                            字面量形式var obj = {
+    name:""
+    }
+原始形式newvar obj=new Object()
+工厂模式function obj3(name,age,fn){
+        var o=new Object(
                         
                     </div>
                     <div class="publish-info">
                             <span class="publish-date">
-                                <i class="far fa-clock fa-fw icon-date"></i>2018-10-11
+                                <i class="far fa-clock fa-fw icon-date"></i>2020-01-12
                             </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
                             
-                            <a href="/categories/Vue/" class="post-category">
-                                    Vue
+                            <a href="/categories/JavaScript/" class="post-category">
+                                    JavaScript
                                 </a>
                             
                             
@@ -1200,8 +1096,12 @@ vuex定义  vuex是一个状态管理的插件，可以解决不同组件之间�
                 
                 <div class="card-action article-tags">
                     
-                    <a href="/tags/vue%E5%9F%BA%E7%A1%80vuex/">
-                        <span class="chip bg-color">vue基础vuex</span>
+                    <a href="/tags/js%E4%B8%AD%E7%BA%A7/">
+                        <span class="chip bg-color">js中级</span>
+                    </a>
+                    
+                    <a href="/tags/JavaScript/">
+                        <span class="chip bg-color">JavaScript</span>
                     </a>
                     
                 </div>

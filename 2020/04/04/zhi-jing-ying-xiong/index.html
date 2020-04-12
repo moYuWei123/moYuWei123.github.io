@@ -890,38 +890,33 @@
     </div>
 
     
-        <link rel="stylesheet" href="/libs/gitalk/gitalk.css">
-<link rel="stylesheet" href="/css/my-gitalk.css">
 
-<div class="card gitalk-card" data-aos="fade-up">
-    <div class="comment_headling" style="font-size: 20px; font-weight: 700; position: relative; padding-left: 20px; top: 15px; padding-bottom: 5px;">
-        <i class="fas fa-comments fa-fw" aria-hidden="true"></i>
-        <span>评论</span>
+    
+
+    
+
+    
+    <div class="livere-card card" data-aos="fade-up">
+    <!-- 来必力City版安装代码 -->
+    <div id="lv-container" class="card-content" data-id="city" data-uid="">
+        <script type="text/javascript">
+            (function (d, s) {
+                let j, e = d.getElementsByTagName(s)[0];
+                if (typeof LivereTower === 'function') {
+                    return;
+                }
+
+                j = d.createElement(s);
+                j.src = 'https://cdn-city.livere.com/js/embed.dist.js';
+                j.async = true;
+
+                e.parentNode.insertBefore(j, e);
+            })(document, 'script');
+        </script>
+        <noscript>为正常使用来必力评论功能请激活JavaScript。</noscript>
     </div>
-    <div id="gitalk-container" class="card-content"></div>
+    <!-- City版安装代码已完成 -->
 </div>
-
-<script src="/libs/gitalk/gitalk.min.js"></script>
-<script>
-    let gitalk = new Gitalk({
-        clientID: '8c9b77e4c087dbfd7d5b',
-        clientSecret: '4785f2b3d1af1d454c9df958719d5b084229b7b9',
-        repo: 'moYuWei123.github.io',
-        owner: '半岛铁盒',
-        admin: "半岛铁盒",
-        id: '2020-04-04T09-25-00',
-        distractionFreeMode: false  // Facebook-like distraction free mode
-    });
-
-    gitalk.render('gitalk-container');
-</script>
-
-    
-
-    
-
-    
-
     
 
     
@@ -991,33 +986,35 @@
                 下一篇&nbsp;<i class="fas fa-chevron-right"></i>
             </div>
             <div class="card">
-                <a href="/2019/03/23/axios/">
+                <a href="/2020/01/12/clone/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/2.jpg" class="responsive-img" alt="axios">
+                        <img src="/medias/featureimages/10.jpg" class="responsive-img" alt="浅克隆与深克隆">
                         
-                        <span class="card-title">axios</span>
+                        <span class="card-title">浅克隆与深克隆</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
                     <div class="summary block-with-text">
                         
-                            axiosAxios 是一个基于 promise 的 HTTP 库，可以用在浏览器和 node.js 中。 类似jq的$.ajaxaxios是一个已经封装好的ajax 的一个库
-axios特性
-从浏览器中创建 XMLHttpRequests
+                            浅克隆
+浅克隆的对象的引用值是拷贝对象里的引用，这两个对象里面的引用（如对象里的数组或者内嵌对象）指向的地方是一致的。
+&lt;script type="text/javascript">
+          var obj1 = {
+  
                         
                     </div>
                     <div class="publish-info">
                             <span class="publish-date">
-                                <i class="far fa-clock fa-fw icon-date"></i>2019-03-23
+                                <i class="far fa-clock fa-fw icon-date"></i>2020-01-12
                             </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
                             
-                            <a href="/categories/Vue/" class="post-category">
-                                    Vue
+                            <a href="/categories/JavaScript/" class="post-category">
+                                    JavaScript
                                 </a>
                             
                             
@@ -1027,12 +1024,12 @@ axios特性
                 
                 <div class="card-action article-tags">
                     
-                    <a href="/tags/vue%E5%9F%BA%E7%A1%80/">
-                        <span class="chip bg-color">vue基础</span>
+                    <a href="/tags/js%E4%B8%AD%E7%BA%A7/">
+                        <span class="chip bg-color">js中级</span>
                     </a>
                     
-                    <a href="/tags/axios/">
-                        <span class="chip bg-color">axios</span>
+                    <a href="/tags/JavaScript/">
+                        <span class="chip bg-color">JavaScript</span>
                     </a>
                     
                 </div>
@@ -1180,7 +1177,7 @@ axios特性
             <br>
             
             &nbsp;<i class="fas fa-chart-area"></i>&nbsp;站点总字数:&nbsp;<span
-                class="white-color">20.7k</span>&nbsp;字
+                class="white-color">21k</span>&nbsp;字
             
             
             
@@ -1307,8 +1304,6 @@ if (windowWidth > 768) {
 
     
 
-    
-    <script type="text/javascript" src="/libs/background/ribbon-dynamic.js" async="async"></script>
     
     
     
