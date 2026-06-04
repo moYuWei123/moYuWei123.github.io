@@ -306,6 +306,13 @@
   });
 })();
 (function(){
+  var imgs = document.querySelectorAll('.post-content img');
+  imgs.forEach(function(img){
+    if (img.complete) { img.classList.add('loaded'); }
+    else { img.addEventListener('load', function(){ img.classList.add('loaded'); }); }
+  });
+})();
+(function(){
   var btn = document.getElementById('backToTop');
   if (!btn) return;
   window.addEventListener('scroll', function(){
