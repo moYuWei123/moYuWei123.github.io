@@ -975,815 +975,6 @@
       </tags>
   </entry>
   <entry>
-    <title>Spark App 血缘解析方案</title>
-    <url>/2022/09/16/Spark-App-%E8%A1%80%E7%BC%98%E8%A7%A3%E6%9E%90%E6%96%B9%E6%A1%88/</url>
-    <content><![CDATA[<blockquote>
-<p>原文链接：<a href="https://tech.youzan.com/spark-app-xie-yuan-jie-xi-fang-an/">https://tech.youzan.com/spark-app-xie-yuan-jie-xi-fang-an/</a></p>
-</blockquote>
-<h1 id="">一、背景</h1>
-
-<p>随着数据仓库的数据量的增长，数据血缘 (Data Lineage or Data Provence) 对于数据分析来说日益重要， 通过数据血缘可以追溯表 - 表，表 - 任务，任务 - 任务的上下游关系， 用来支撑问题数据溯源，孤岛数据下线的需求。</p>
-
-<p>目前已经基于 ANTLR 语法解析支持了 SQL 任务的血缘解析， 而 Spark App 任务的血缘仍然是通过人工配置方式进行。 我们希望能够将 Spark App 任务的解析做个补充，完善血缘逻辑。</p>
-
-<p>目前线上的 Spark App 任务支持 Spark 2.3、 Spark 3.1 两个版本， 并且支持 python2 / 3、 java、scala 类型， 运行平台各自支持 yarn 和 k8s, 血缘的收集机制需要考虑适配所有上述所有任务。</p>
-
-<h1 id="">二、思路</h1>
-
-<p>可以想到的 Spark App 任务的解析思路有以下三类：</p>
-
-<ul>
-<li>基于代码解析： 通过解析 Spark App 的逻辑去达到血缘解析的目的， 类似的产品有 SPROV [1]</li>
-<li>基于动态监听： 通过修改代码达到运行时收集血缘的目的的 Titian [2] 和 Pebble [3] , 或者通过插件方式在运行时收集血缘的 Spline [4] 和 Apache Atlas [5]</li>
-<li>基于日志解析： 通过分析例如 Spark App 的 event log 信息，然后解析出任务的血缘</li>
-</ul>
-
-<p>因为 Spark App 的写法多样， 基于代码的解析需要考虑 java、python、 scala， 显得过于复杂， 我们首先考虑了基于日志的分析。 通过分析 spark3 和 spark2 的任务的历史 event log 发现， spark2 的 event log 没有完整的 hive 表 相关的元信息， 而 spark3 则在各种读取算子例如 FileSourceScanExec 和 HiveTableScan 的基础上打印出了 hive 表元信息， 所以基于 event log 方式不能完美支持 spark2 。</p>
-
-<p>所以基于此我们最终打算采用基于动态监听的方式，并且调研了 spline, 进行了可用性分析。 下面介绍下 spline 的使用和设计原理。</p>
-
-<h1 id="spline">三、spline</h1>
-
-<h2 id="31spline">3.1 spline 原理</h2>
-
-<p>spline （Spark Lineage）是一个免费基于 Apache 2.0 协议开源的  Spark 血缘收集系统。该系统主要分为三部分： spline agent、  spline server 和 spline ui。 </p>
-
-<p>这里主要介绍 spline agent 的原理， 因为这是负责血缘解析的部分， 至于 spline server 和 ui 就负责血缘的收集和展示，可以用内部的系统替换。</p>
-
-<p>总架构图如下图所示：</p>
-
-<p><img src="https://tech.youzan.com/content/images/2022/09/01.png" alt="spline"></p>
-
-<h3 id="311">3.1.1 初始化</h3>
-
-<p>spline 支持两种初始化方式，codeless  和 programmatic。本质上都是注册一个  <code>QueryExecutionListener</code>， 负责监听 <code>SparkListenerSQLExecutionEnd</code> 消息。</p>
-
-<h5 id="codeless">codeless 初始化</h5>
-
-<p>codeless init 就是通过配置化方式嵌入用户的 Spark APP 程序， 而不需要修改代码。通过注册 QueryExecutionListener 监听器，可以接收并且处理 Spark 的消息。 启动配置例如：</p>
-
-<pre><code class="language-shell">spark-submit  --jars /path/to/lineage/spark-3.1-spline-agent-bundle_2.12-1.0.0-SNAPSHOT.jar --files /path/to/lineage/spline.properties --num-executors 2 --executor-memory 1G --driver-memory 1G --name test_lineage --deploy-mode cluster --conf spark.spline.mode=BEST_EFFORT --conf spark.spline.lineageDispatcher.http.producer.url=http://172.18.221.156:8080/producer --conf "spark.sql.queryExecutionListeners=za.co.absa.spline.harvester.listener.SplineQueryExecutionListener"  test.py  
-</code></pre>
-
-<p>通过 --jars 执行 spline agent jar 包地址， 也可以默认放到 spark 部署的 jars 目录下</p>
-
-<p>通过 --files 指定 spline properties 文件， 也可以直接通过 --conf 指定配置项，配置项需要额外加上 spark. 前缀</p>
-
-<p>通过  --conf "spark.sql.queryExecutionListeners = za.co.absa.spline.harvester.listener.SplineQueryExecutionListener" 可以注册监听器</p>
-
-<h5 id="programmatic">programmatic 初始化</h5>
-
-<p>programmatic init 需要在代码中显示的开启血缘解析， 例如</p>
-
-<ul>
-<li>scala demo</li>
-</ul>
-
-<pre><code class="language-scala">// given a Spark session ...
-val sparkSession: SparkSession = ???
-
-// ... enable data lineage tracking with Spline
-import za.co.absa.spline.harvester.SparkLineageInitializer._  
-sparkSession.enableLineageTracking()  
-</code></pre>
-
-<ul>
-<li>java demo</li>
-</ul>
-
-<pre><code class="language-java">import za.co.absa.spline.harvester.SparkLineageInitializer;  
-// ...
-SparkLineageInitializer.enableLineageTracking(session);  
-</code></pre>
-
-<ul>
-<li>python demo</li>
-</ul>
-
-<pre><code class="language-python">from pyspark.sql import SparkSession  
-from pyspark.sql import functions as F
-
-spark = SparkSession.builder \  
-    .appName("spline_app")\
-    .config("spark.jars", "dbfs:/path_where_the_jar_is_uploaded")\
-    .getOrCreate()
-
-sc = spark.sparkContext  
-sc.setSystemProperty("spline.mode", "REQUIRED")
-
-jvm = sc._jvm  
-sc._jvm.za.co.absa.spline.harvester.SparkLineageInitializer.enableLineageTracking(spark._jsparkSession)  
-</code></pre>
-
-<h3 id="312">3.1.2 血缘解析</h3>
-
-<p>血缘解析逻辑在 <code>SplineAgent.handle()</code> 方法。通过调用 <code>LineageHarvester.harvest()</code> 获取最终的血缘， 并交给 <code>LineageDispatcher</code> 输出结果。</p>
-
-<p>通过 <code>SparkListenerSQLExecutionEnd</code> 消息可以获取到消息中的 <code>QueryExecution</code>, 血缘解析基于 <code>QueryExecution</code> 中的 analyzed logical plan 和 executedPlan 进行， <code>LineageHarvester.harvest()</code> 逻辑处理如下：</p>
-
-<p><img src="https://tech.youzan.com/content/images/2022/09/02.png" alt="image-20220830170308300"></p>
-
-<ol>
-<li><p><code>tryExtractWriteCommand (logicalPlan)</code> 负责解析出 logicalPlan 中的写操作。 写操作的解析依托于插件方式。</p>
-
-<p>通过获取 <code>PluginRegistry</code>  中  <code>WriteNodeProcessing</code>  类型的插件， 获取 logicalPlan 中的写操作，通过对具体的 Command 的解析，可以获取到例如 hive 表的 表名信息。最后信息会封装为 <code>WriteCommand</code> 数据结构。</p>
-
-<p>例如 <code>DataSourceV2Plugin.writeNodeProcessor()</code> 会负责 <code>V2WriteCommand</code>、<code>CreateTableAsSelect</code>、<code>ReplaceTableAsSelect</code>这几个命令的解析。</p>
-
-<p>解析插件可以自己扩展，丰富 spline 解析的数据源， 插件需要继承 <code>za.co.absa.spline.harvester.plugin.Plugin</code>,  spline agent 会在启动的时候自动加载 classpath 中的所有插件。</p></li>
-<li><p>解析到 writeCommand 以后会基于 writeCommand 中的 query 字段解析读操作。读操作基于 query 这部分 logicalPlan 进行递归解析</p>
-
-<p>最后解析完成可以得到 plan 和 event 两个 json 信息，plan 为血缘关系， event 为额外的辅助信息。</p></li>
-</ol>
-
-<p>例如：</p>
-
-<pre><code class="language-json">[
-  "plan",
-  {
-    "id": "acd5157c-ddc5-5ef0-b1bc-06bb8dcda841",
-    "name": "team evaluation ranks",
-    "operations": {
-      "write": {
-        "outputSource": "hdfs:///user/hive/warehouse/dm_ai.db/dws_kdt_comment_ranks_info",
-        "append": false,
-        "id": "op-0",
-        "name": "CreateDataSourceTableAsSelectCommand",
-        "childIds": [
-          "op-1"
-        ],
-        "params": {
-          "table": {
-            "identifier": {
-              "table": "dws_kdt_comment_ranks_info",
-              "database": "dm_ai"
-            },
-            "storage": "Storage()"
-          }
-        },
-        "extra": {
-          "destinationType": "orc"
-        }
-      },
-      "reads": [
-        {
-          "inputSources": [
-            "hdfs://yz-cluster-qa/user/hive/warehouse/dm_ai.db/dws_kdt_comment_rank_base"
-          ],
-          "id": "op-6",
-          "name": "LogicalRelation",
-          "output": [
-            "attr-0",
-            "attr-1",
-            "attr-2",
-            "attr-3",
-            "attr-4",
-            "attr-5",
-            "attr-6",
-            "attr-7",
-            "attr-8",
-            "attr-9",
-            "attr-10",
-            "attr-11",
-            "attr-12"
-          ],
-          "params": {
-            "table": {
-              "identifier": {
-                "table": "dws_kdt_comment_rank_base",
-                "database": "dm_ai"
-              },
-              "storage": "Storage(Location: hdfs://yz-cluster-qa/user/hive/warehouse/dm_ai.db/dws_kdt_comment_rank_base, Serde Library: org.apache.hadoop.hive.ql.io.orc.OrcSerde, InputFormat: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat, OutputFormat: org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat, Storage Properties: [serialization.format=1])"
-            }
-          },
-          "extra": {
-            "sourceType": "hive"
-          }
-        }
-      ],
-      "other": [
-        {
-          "id": "op-5",
-          "name": "SubqueryAlias",
-          "childIds": [
-            "op-6"
-          ],
-          "output": [
-            "attr-0",
-            "attr-1",
-            "attr-2",
-            "attr-3",
-            "attr-4",
-            "attr-5",
-            "attr-6",
-            "attr-7",
-            "attr-8",
-            "attr-9",
-            "attr-10",
-            "attr-11",
-            "attr-12"
-          ],
-          "params": {
-            "identifier": "spark_catalog.dm_ai.dws_kdt_comment_rank_base"
-          }
-        },
-        {
-          "id": "op-4",
-          "name": "Filter",
-          "childIds": [
-            "op-5"
-          ],
-          "output": [
-            "attr-0",
-            "attr-1",
-            "attr-2",
-            "attr-3",
-            "attr-4",
-            "attr-5",
-            "attr-6",
-            "attr-7",
-            "attr-8",
-            "attr-9",
-            "attr-10",
-            "attr-11",
-            "attr-12"
-          ],
-          "params": {
-            "condition": {
-              "__exprId": "expr-0"
-            }
-          }
-        },
-        {
-          "id": "op-3",
-          "name": "Project",
-          "childIds": [
-            "op-4"
-          ],
-          "output": [
-            "attr-0",
-            "attr-1",
-            "attr-2",
-            "attr-3",
-            "attr-4",
-            "attr-5",
-            "attr-6",
-            "attr-7",
-            "attr-8",
-            "attr-9",
-            "attr-10",
-            "attr-11",
-            "attr-12"
-          ],
-          "params": {
-            "projectList": [
-              {
-                "__attrId": "attr-0"
-              },
-              {
-                "__attrId": "attr-1"
-              },
-              {
-                "__attrId": "attr-2"
-              },
-              {
-                "__attrId": "attr-3"
-              },
-              {
-                "__attrId": "attr-4"
-              },
-              {
-                "__attrId": "attr-5"
-              },
-              {
-                "__attrId": "attr-6"
-              },
-              {
-                "__attrId": "attr-7"
-              },
-              {
-                "__attrId": "attr-8"
-              },
-              {
-                "__attrId": "attr-9"
-              },
-              {
-                "__attrId": "attr-10"
-              },
-              {
-                "__attrId": "attr-11"
-              },
-              {
-                "__attrId": "attr-12"
-              }
-            ]
-          }
-        },
-        {
-          "id": "op-2",
-          "name": "Project",
-          "childIds": [
-            "op-3"
-          ],
-          "output": [
-            "attr-0",
-            "attr-1",
-            "attr-2",
-            "attr-3",
-            "attr-4",
-            "attr-5",
-            "attr-6",
-            "attr-7",
-            "attr-8",
-            "attr-9",
-            "attr-10",
-            "attr-11",
-            "attr-12",
-            "attr-13"
-          ],
-          "params": {
-            "projectList": [
-              {
-                "__attrId": "attr-0"
-              },
-              {
-                "__attrId": "attr-1"
-              },
-              {
-                "__attrId": "attr-2"
-              },
-              {
-                "__attrId": "attr-3"
-              },
-              {
-                "__attrId": "attr-4"
-              },
-              {
-                "__attrId": "attr-5"
-              },
-              {
-                "__attrId": "attr-6"
-              },
-              {
-                "__attrId": "attr-7"
-              },
-              {
-                "__attrId": "attr-8"
-              },
-              {
-                "__attrId": "attr-9"
-              },
-              {
-                "__attrId": "attr-10"
-              },
-              {
-                "__attrId": "attr-11"
-              },
-              {
-                "__attrId": "attr-12"
-              },
-              {
-                "__exprId": "expr-7"
-              }
-            ]
-          }
-        },
-        {
-          "id": "op-1",
-          "name": "Project",
-          "childIds": [
-            "op-2"
-          ],
-          "output": [
-            "attr-13"
-          ],
-          "params": {
-            "projectList": [
-              {
-                "__attrId": "attr-13"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    "attributes": [
-      {
-        "id": "attr-0",
-        "dataType": "e63adadc-648a-56a0-9424-3289858cf0bb",
-        "name": "id"
-      },
-      {
-        "id": "attr-1",
-        "dataType": "75fe27b9-9a00-5c7d-966f-33ba32333133",
-        "name": "content"
-      },
-      {
-        "id": "attr-2",
-        "dataType": "e63adadc-648a-56a0-9424-3289858cf0bb",
-        "name": "goods_id"
-      },
-      {
-        "id": "attr-3",
-        "dataType": "e63adadc-648a-56a0-9424-3289858cf0bb",
-        "name": "kdt_id"
-      },
-      {
-        "id": "attr-4",
-        "dataType": "e63adadc-648a-56a0-9424-3289858cf0bb",
-        "name": "score"
-      },
-      {
-        "id": "attr-5",
-        "dataType": "e63adadc-648a-56a0-9424-3289858cf0bb",
-        "name": "group_id"
-      },
-      {
-        "id": "attr-6",
-        "dataType": "e63adadc-648a-56a0-9424-3289858cf0bb",
-        "name": "score_level"
-      },
-      {
-        "id": "attr-7",
-        "dataType": "75fe27b9-9a00-5c7d-966f-33ba32333133",
-        "name": "created_at"
-      },
-      {
-        "id": "attr-8",
-        "dataType": "e63adadc-648a-56a0-9424-3289858cf0bb",
-        "name": "final_score"
-      },
-      {
-        "id": "attr-9",
-        "dataType": "e63adadc-648a-56a0-9424-3289858cf0bb",
-        "name": "comment_rerank_score"
-      },
-      {
-        "id": "attr-10",
-        "dataType": "75fe27b9-9a00-5c7d-966f-33ba32333133",
-        "name": "updated_at"
-      },
-      {
-        "id": "attr-11",
-        "dataType": "e63adadc-648a-56a0-9424-3289858cf0bb",
-        "name": "comment_origin_score"
-      },
-      {
-        "id": "attr-12",
-        "dataType": "75fe27b9-9a00-5c7d-966f-33ba32333133",
-        "name": "par"
-      },
-      {
-        "id": "attr-13",
-        "dataType": "75fe27b9-9a00-5c7d-966f-33ba32333133",
-        "childRefs": [
-          {
-            "__exprId": "expr-7"
-          }
-        ],
-        "name": "comment_info"
-      }
-    ],
-    "expressions": {
-      "functions": [
-        {
-          "id": "expr-2",
-          "dataType": "ab4da308-91fb-550a-a5e4-beddecff2a2b",
-          "childRefs": [
-            {
-              "__attrId": "attr-12"
-            }
-          ],
-          "extra": {
-            "simpleClassName": "Cast",
-            "_typeHint": "expr.Generic"
-          },
-          "name": "cast",
-          "params": {
-            "timeZoneId": "Asia/Shanghai"
-          }
-        },
-        {
-          "id": "expr-1",
-          "dataType": "a155e715-56ab-59c4-a94b-ed1851a6984a",
-          "childRefs": [
-            {
-              "__exprId": "expr-2"
-            },
-            {
-              "__exprId": "expr-3"
-            }
-          ],
-          "extra": {
-            "simpleClassName": "EqualTo",
-            "_typeHint": "expr.Binary",
-            "symbol": "="
-          },
-          "name": "equalto"
-        },
-        {
-          "id": "expr-5",
-          "dataType": "ba7ef708-332f-54fd-a671-c91d13ae6f8e",
-          "childRefs": [
-            {
-              "__exprId": "expr-6"
-            }
-          ],
-          "extra": {
-            "simpleClassName": "Cast",
-            "_typeHint": "expr.Generic"
-          },
-          "name": "cast",
-          "params": {
-            "timeZoneId": "Asia/Shanghai"
-          }
-        },
-        {
-          "id": "expr-4",
-          "dataType": "a155e715-56ab-59c4-a94b-ed1851a6984a",
-          "childRefs": [
-            {
-              "__attrId": "attr-11"
-            },
-            {
-              "__exprId": "expr-5"
-            }
-          ],
-          "extra": {
-            "simpleClassName": "GreaterThanOrEqual",
-            "_typeHint": "expr.Binary",
-            "symbol": "&gt;="
-          },
-          "name": "greaterthanorequal"
-        },
-        {
-          "id": "expr-0",
-          "dataType": "a155e715-56ab-59c4-a94b-ed1851a6984a",
-          "childRefs": [
-            {
-              "__exprId": "expr-1"
-            },
-            {
-              "__exprId": "expr-4"
-            }
-          ],
-          "extra": {
-            "simpleClassName": "And",
-            "_typeHint": "expr.Binary",
-            "symbol": "&amp;&amp;"
-          },
-          "name": "and"
-        },
-        {
-          "id": "expr-8",
-          "dataType": "75fe27b9-9a00-5c7d-966f-33ba32333133",
-          "childRefs": [
-            {
-              "__attrId": "attr-3"
-            },
-            {
-              "__attrId": "attr-0"
-            },
-            {
-              "__attrId": "attr-8"
-            }
-          ],
-          "extra": {
-            "simpleClassName": "PythonUDF",
-            "_typeHint": "expr.Generic"
-          },
-          "name": "pythonudf",
-          "params": {
-            "name": "fun_one",
-            "evalType": 100,
-            "func": "PythonFunction(WrappedArray(...),{PYTHONPATH={{PWD}}/pyspark.zip&lt;CPS&gt;{{PWD}}/py4j-0.10.9-src.zip, PYTHONHASHSEED=0},[],/data/venv/hdp-envpy3/bin/python,3.6,[],PythonAccumulatorV2(id: 0, name: None, value: []))",
-            "udfDeterministic": true
-          }
-        },
-        {
-          "id": "expr-7",
-          "dataType": "75fe27b9-9a00-5c7d-966f-33ba32333133",
-          "childRefs": [
-            {
-              "__exprId": "expr-8"
-            }
-          ],
-          "extra": {
-            "simpleClassName": "Alias",
-            "_typeHint": "expr.Alias"
-          },
-          "name": "comment_info",
-          "params": {
-            "name": "comment_info",
-            "nonInheritableMetadataKeys": [
-              "__dataset_id",
-              "__col_position"
-            ],
-            "explicitMetadata": "{}"
-          }
-        }
-      ],
-      "constants": [
-        {
-          "id": "expr-3",
-          "dataType": "455d9d5b-7620-529e-840b-897cee45e560",
-          "extra": {
-            "simpleClassName": "Literal",
-            "_typeHint": "expr.Literal"
-          },
-          "value": 20220830
-        },
-        {
-          "id": "expr-6",
-          "dataType": "455d9d5b-7620-529e-840b-897cee45e560",
-          "extra": {
-            "simpleClassName": "Literal",
-            "_typeHint": "expr.Literal"
-          },
-          "value": 80
-        }
-      ]
-    },
-    "systemInfo": {
-      "name": "spark",
-      "version": "3.1.2-yz-1.4"
-    },
-    "agentInfo": {
-      "name": "spline",
-      "version": "1.0.0-SNAPSHOT+874577a"
-    },
-    "extraInfo": {
-      "appName": "team evaluation ranks",
-      "dataTypes": [
-        {
-          "_typeHint": "dt.Simple",
-          "id": "e63adadc-648a-56a0-9424-3289858cf0bb",
-          "name": "bigint",
-          "nullable": true
-        },
-        {
-          "_typeHint": "dt.Simple",
-          "id": "75fe27b9-9a00-5c7d-966f-33ba32333133",
-          "name": "string",
-          "nullable": true
-        },
-        {
-          "_typeHint": "dt.Simple",
-          "id": "a155e715-56ab-59c4-a94b-ed1851a6984a",
-          "name": "boolean",
-          "nullable": true
-        },
-        {
-          "_typeHint": "dt.Simple",
-          "id": "ab4da308-91fb-550a-a5e4-beddecff2a2b",
-          "name": "int",
-          "nullable": true
-        },
-        {
-          "_typeHint": "dt.Simple",
-          "id": "455d9d5b-7620-529e-840b-897cee45e560",
-          "name": "int",
-          "nullable": false
-        },
-        {
-          "_typeHint": "dt.Simple",
-          "id": "ba7ef708-332f-54fd-a671-c91d13ae6f8e",
-          "name": "bigint",
-          "nullable": false
-        }
-      ]
-    }
-  }
-]
-</code></pre>
-
-<pre><code class="language-json">[
-  "event",
-  {
-    "planId": "acd5157c-ddc5-5ef0-b1bc-06bb8dcda841",
-    "timestamp": 1661960765255,
-    "durationNs": 4353094937,
-    "extra": {
-      "appId": "application_1656468332243_128755",
-      "user": "app",
-      "readMetrics": {
-        "numFiles": 1,
-        "scanTime": 995,
-        "pruningTime": 0,
-        "metadataTime": 161,
-        "filesSize": 87538,
-        "numOutputRows": 7269,
-        "numPartitions": 1
-      },
-      "writeMetrics": {
-        "numFiles": 1,
-        "numOutputBytes": 48430,
-        "numOutputRows": 6785,
-        "numParts": 0
-      }
-    }
-  }
-]
-</code></pre>
-
-<h3 id="313">3.1.3 血缘分发</h3>
-
-<p>LineageDispatcher 决定血缘如何发送， 而内置的 Dispatcher 的实现也是一目了然的。 <br>
-例如：HttpLineageDispatcher 就是将血缘发送给一个 HTTP 接口， KafkaLineageDispatcher 就是发给一个 Kafka topic, LoggingLineageDispatcher 就是将血缘打印在 Spark APP 的 stderr 日志里， 方便调试确认。</p>
-
-<p>如果要自定义 dispatcher, 可以自己继承 LineageDispatcher, 并且提供一个入参为 <code>org.apache.commons.configuration.Configuration</code> 的构造函数。
-配置如下：</p>
-
-<pre><code class="language-shell">spline.lineageDispatcher=my-dispatcher  
-spline.lineageDispatcher.my-dispatcher.className=org.example.spline.MyDispatcherImpl  
-spline.lineageDispatcher.my-dispatcher.prop1=value1  
-spline.lineageDispatcher.my-dispatcher.prop2=value2  
-</code></pre>
-
-<h3 id="314">3.1.4 后置处理</h3>
-
-<p>post processing filter 可以在血缘解析完成后，交给 dispatcher 前进行一些后置处理，例如脱敏 。 实现一个 filter 需要实现 <code>za.co.absa.spline.harvester.postprocessing.PostProcessingFilter</code>， 构造器接受 一个类型为 <code>org.apache.commons.configuration.Configuration</code> 的入参。</p>
-
-<p>配置方式如下:</p>
-
-<pre><code class="language-shell&nbsp;">spline.postProcessingFilter=my-filter  
-spline.postProcessingFilter.my-filter.className=my.awesome.CustomFilter  
-spline.postProcessingFilter.my-filter.prop1=value1  
-spline.postProcessingFilter.my-filter.prop2=value2  
-</code></pre>
-
-<h2 id="32">3.2 版本关系</h2>
-
-<p><img src="https://tech.youzan.com/content/images/2022/09/03-1.png" alt=""></p>
-
-<p>备注： 但是 pyspark 2.3 如果要支持 codeless init ， 需要打个 patch <a href="https://issues.apache.org/jira/browse/SPARK-23228">SPARK-23228</a>， 相关问题可以参考这个 ISSUE （ <a href="https://github.com/AbsaOSS/spline-spark-agent/issues/490">https://github.com/AbsaOSS/spline-spark-agent/issues/490</a> ）。</p>
-
-<h2 id="33spline">3.3 spline 集成</h2>
-
-<h3 id="331spline">3.3.1 集成 spline</h3>
-
-<p>编译 对应 spark 与 scala 版本的 spline-agent jar 包。</p>
-
-<p>如 spark 3.1</p>
-
-<pre><code>mvn scala-cross-build:change-version -Pscala-2.12  
-mvn clean install -Pscala-2.12,spark-3.1 -DskipTests=True  
-</code></pre>
-
-<p>将 spark agent jar 包部署在 /path/to/spark/jars 目录下。</p>
-
-<p>配置 spark-defaults.conf</p>
-
-<pre><code>spark.sql.queryExecutionListeners=za.co.absa.spline.harvester.listener.SplineQueryExecutionListener  
-spark.spline.mode=BEST_EFFORT  
-spark.spline.lineageDispatcher=composite  
-spark.spline.lineageDispatcher.composite.dispatchers=logging,http  
-spark.spline.lineageDispatcher.http.producer.url=http://[ip:port]/producer  
-</code></pre>
-
-<h3 id="332">3.3.2 血缘收集系统</h3>
-
-<p>与现有系统集成要适当修改代码，在最后的 event 消息中添加该 Spark APP 对应的工作流或者任务名称， 将血缘和任务信息发给自定义的 HTTP server， 解析血缘上报 kafka, 统一消费处理。</p>
-
-<h2 id="34spline">3.4 spline 演示</h2>
-
-<p>通过 docker-compose 可以一键启动 spline server 端。 可以通过 spline ui 看到解析出来的血缘。</p>
-
-<pre><code class="language-text">1. wget https://raw.githubusercontent.com/AbsaOSS/spline-getting-started/main/docker/docker-compose.yml  
-2. wget https://raw.githubusercontent.com/AbsaOSS/spline-getting-started/main/docker/.env  
-3. export DOCKER_HOST_EXTERNAL=yourhostip // spline ui访问server默认地址127.0.0.1, 不修改无法外部访问  
-4. docker-compose up  
-</code></pre>
-
-<p><img src="https://tech.youzan.com/content/images/2022/09/03.png" alt="03"></p>
-
-<h1 id="">四、总结</h1>
-
-<p>spline agent 能够无感知的为线上运行的 Spark APP 程序增加血缘解析， 是个很不错的思路， 可以基于这个方向进行进一步的研究优化。目前 spline agent 有一些无法处理的逻辑，如下所示： <br>
-1. 无法解析到 RDD 中的来源逻辑， 如果 dataframe 转换为 RDD 进行操作，则无法追踪到这之后的血缘。这跟 spline 解析的时候通过 logicalPlan 中的 child 关系进行递归有关， 遇到 LogicalRDD  递归结束。可能的解决方案是遇到 LogicalRDD 算子的时候通过解析 RDD 的 dependency 关系查找血缘信息。 <br>
-2. 血缘解析基于写入触发， 所以如果任务只做查询是解析不到血缘的</p>
-
-<h1 id="">五、参考资料</h1>
-
-<ol>
-<li><a href="https://www.sigsac.org/ccs/CCS2009/pd/abstract_38.pdf">SPROV 2.0</a>  </li>
-<li><a href="https://github.com/UCLA-SEAL/Titian">TiTian</a>: <a href="http://web.cs.ucla.edu/~todd/research/vldb16.pdf">http://web.cs.ucla.edu/~todd/research/vldb16.pdf</a>  </li>
-<li><a href="https://dl.acm.org/doi/10.1145/3299869.3320225">Pebble</a>  </li>
-<li><a href="https://absaoss.github.io/spline/">Spline</a>  </li>
-<li><a href="https://docs.cloudera.com/runtime/7.2.2/atlas-reference/topics/atlas-spark-entities.html">Atlas</a>  </li>
-<li><a href="https://github.com/AbsaOSS/spline-spark-agent">spline-spark-agent github</a>  </li>
-<li><a href="https://link.springer.com/article/10.1007/s13222-021-00387-7">Collecting and visualizing data lineage of Spark jobs</a></li>
-</ol>]]></content>
-      <categories>
-        <category>编程</category>
-      </categories>
-      <tags>
-        <tag>有赞技术</tag>
-        <tag>大数据</tag>
-        <tag>bigdata</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>Dumbphone 2</title>
     <url>/2026/06/04/Dumbphone-2/</url>
     <content><![CDATA[<blockquote>
@@ -1815,391 +1006,6 @@ spark.spline.lineageDispatcher.http.producer.url=http://[ip:port]/producer
       </categories>
       <tags>
         <tag>Solidot</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>对比学习在有赞的应用</title>
-    <url>/2022/07/05/%E5%AF%B9%E6%AF%94%E5%AD%A6%E4%B9%A0%E5%9C%A8%E6%9C%89%E8%B5%9E%E7%9A%84%E5%BA%94%E7%94%A8/</url>
-    <content><![CDATA[<blockquote>
-<p>原文链接：<a href="https://tech.youzan.com/dui-bi-xue-xi-zai-you-zan-d/">https://tech.youzan.com/dui-bi-xue-xi-zai-you-zan-d/</a></p>
-</blockquote>
-<h2 id="1">1. 对比学习的引入</h2>
-
-<p><img src="https://tech.youzan.com/content/images/2022/07/Snipaste_2022-07-05_15-58-37.png" alt="对比学习在有赞的应用"></p><p>一般做算法任务时，都需要搜集大量标注的数据，假如我们要预测一个商品的产品词（中心词），下面是一个商品标题：</p><p></p>
-<pre><code>三亚亚龙湾玫瑰谷JESS玫瑰臻白颜透润花瓣 免洗面膜收缩毛孔
-</code></pre>
-
-<p>这个商品的产品词就是 “面膜”，任务就是要把面膜识别出来，看起来是个标准的 NER 任务，我们也确实使用了 CRF 和指针网络之类的方法，对于上面这种标题效果还不错，但是由于 SaaS 商家的经营习惯不同于平台，很少依赖平台搜索流量，所以很多标题很简短甚至不会包含产品词，比如：</p>
-
-<pre><code>迪奥丝绒系列760 专属女团色 蓝调正红 可盐可甜
-澳优能立多3段
-</code></pre>
-
-<p>对于这种问题，NER 相关的算法就无解了，模型无法在商品标题中找到合适的产品词，当然也可以认为是标题中没有产品词。但是这种模型很多时候会从标题里预测出来奇奇怪怪的结果，导致产品词太发散，业务方很难基于产品词制定规则。</p>
-
-<p>去年我们接触到了对比学习，被 OpenAI 的<a href="https://openai.com/blog/clip/">CLIP: Connecting Text and Images</a> 惊艳到了，效果之好，方法之简单，令人兴奋。而且微软相似的模型<a href="https://www.microsoft.com/en-us/research/blog/turing-bletchley-a-universal-image-language-representation-model-by-microsoft/">Turing Bletchley: A Universal Image Language Representation model by Microsoft - Microsoft Research</a> 甚至还展现了 OCR 的能力，再加上<a href="https://zhuanlan.zhihu.com/p/370782081">微博</a>做的文本对匹配的效果，为我们打开了新的思路。如果利用对比学习学到商品标题和产品词的表示，那只需要清理一批产品词计算向量存到向量计算引擎，需要预测的商品标题计算完表示以后做一次向量召回就会得到语义相关的产品词，就算商品标题里不含产品词也可以找出一个合理的产品词，而且产品词词库可控，将会是一个理想的解决方案。</p>
-
-<h2 id="2">2. 对比学习的原理</h2>
-
-<p>对比学习的思想很简单，就是学习对象的表示（向量），相关对象的表示要接近，不相关对象的表示要远离。对比学习也算是自监督学习，跟其他方法的区别可以看下图，对比学习也是有 label 的，但是跟监督学习不同的是，这个 label 不是最终任务的 label。</p>
-
-<p><img src="https://tech.youzan.com/content/images/2022/06/Snipaste_2022-06-21_17-32-59.png" alt="对比学习在有赞的应用"></p>
-
-<p>谷歌的<a href="https://arxiv.org/abs/1503.03832">FaceNet</a> 以及微软的<a href="https://www.microsoft.com/en-us/research/publication/learning-deep-structured-semantic-models-for-web-search-using-clickthrough-data/">DSSM</a> 等模型，也是这种思想。我们以人脸识别为例，如果使用监督学习的方式，任务就是基于人脸图片预测人的唯一 ID。那就需要收集每个人很多张人脸照片（不同角度不同年龄不同光照等），这几乎无法实现。所以可行的方法就是让模型学会表示人脸，同一个人不同照片得到的表示接近，不同的人的照片表示不接近。FaceNet 正是基于这种思想，使用 Triplet Loss，拉近 Anchor (用户 A 的照片 1) 与 Positive (用户 A 的照片 2) 的距离，推远 Anchor (用户 A 的照片 1) 与 Negative (用户 B 的照片 1) 的距离，从而学会生成有区分度的人脸表示。这里每个样本中的负样本数量为 1，即：(Q, P, N)，这里用 Q 表示 Anchor，P 表示正样本，N 表示负样本。DSSM 中负样本的数量为 4，即：(Q, P, N_1,N_2,N_3,N_4)。</p>
-
-<p>从<a href="https://arxiv.org/abs/2002.05709">SimCLR</a> 到 CLIP，再到最近大火的 <a href="https://openai.com/dall-e-2/">DALL·E 2</a>，对比学习的潜力被大量开发，文本与文本的对比，图像与图像的对比，文本与图像的对比，效果都非常好，而且最重要的是，工业界落地容易，只要提前计算好向量表示就可以实时推理。</p>
-
-<h3 id="21">2.1 损失函数</h3>
-
-<p>我们来看看对比学习是怎么训练的，负样本的数量对模型效果的影响还是很大的，SimCLR 文章给出了 batch_size（可以理解为负样本数量）与模型效果的关系：
-<img src="https://tech.youzan.com/content/images/2022/06/Snipaste_2022-06-21_17-34-00.png" alt="对比学习在有赞的应用"></p>
-
-<p>上面我们提过 FaceNet 一个负样本，DSSM4 个负样本，而 CLIP 的负样本数量达到了 32767，
-这么多的负样本就是用来计算损失的，损失函数为 infoNCE，形式如下：</p>
-
-<p><img src="https://tech.youzan.com/content/images/2022/06/Snipaste_2022-06-21_17-34-34.png" alt="对比学习在有赞的应用"></p>
-
-<p>sim (x, y) 代表两个表示的相似度，可以是余弦相似度（一般模型最后一层会是 L2 归一化，所以余弦相似度 sim (x, y) 的结果在 - 1 到 1 之间）。τ 为温度超参，如果 τ 为 1，sim (x, y) 看做 logits，那就是个标准的交叉熵。一般交叉熵我们用于分类任务，这么说的话对比学习也算一种分类任务。</p>
-
-<p>以下图为例，这组样本可以表示为：(Q, P, N_1, N_2)，即有两个负样本，模型会计算出 sim (Q, P)，sim (Q, N_1)， sim (Q, N_2)，为了最大化 sim (Q, P) 这一 “类别” 的概率，我们可以认为该样本的 one-hot label 是 [1, 0, 0]。如果我们按照 (Q, P, N_1, N_2) 的方式准备所有训练数据，那每个样本的 label 就都是 [1, 0, 0]，而且损失函数是交叉熵，形式上已经是分类任务了，不同的是，这个 “类别” 没有实际意义。从另外一个角度想，分类任务可以看到所有的负样本（所有的类别），而对比学习只能看到有限的负样本，所以负样本越多学习难度会越大，训练出来的模型更稳健。</p>
-
-<p><img src="https://tech.youzan.com/content/images/2022/06/Snipaste_2022-06-21_17-35-45.png" alt="对比学习在有赞的应用"></p>
-
-<h3 id="22batch">2.2 Batch 内负采样</h3>
-
-<p>如果像上图一样，每条训练数据中都提前准备好若干个负样本（可以全局负采样），假设两个负样本，即（Q, P, N_1, N_2）,当按 batch 训练时，需要分别计算 batch_Q, batch_P, batch_N1, batch_N2 的向量表示，然后再计算对比损失，计算量非常大，而且负样本数量越多训练越慢。所以一种经典的方法就是 batch 内负采样，训练数据只需要是（Q, P），实际计算时，一个 batch 内的其他 Q 对应的 P 就可以作为当前 Q 的 N，前向计算只需要计算 batch_Q 和 batch_P，只需要提高 batch_size 就可以增加负样本数量。</p>
-
-<p>用 CLIP 的图来解释 batch 内负采样的计算过程，如下图所示，batch 文本经过 Text Encoder 得到 batch_size * dim 的矩阵，记做 ET，也就是图里 T_1, T_2, ...,T_N 的向量表示。batch 图像经过 Image Encoder 得到 batch_size * dim 的矩阵，记做 EI，进行矩阵乘法 ET * transpose (EI) 后就得到 batch_size * batch_size 的相似度方阵，对角位置就是相关的文本和图像的相似度，即 sim (Q, P)，其他位置就是不相关的文本和图像的相似度 sim (Q, N)，所以这个 batch 的稀疏 label 就是（0，1，2，...，batch_size - 1）。有了 logits 和 label 就可以使用 infoNCE 计算损失函数。</p>
-
-<p><img src="https://tech.youzan.com/content/images/2022/06/Snipaste_2022-06-21_17-36-29.png" alt="对比学习在有赞的应用"></p>
-
-<h2 id="3">3. 模型设计</h2>
-
-<p>在我们决定尝试用对比学习（语义匹配）的方式做商品的产品词预测时，就想到了用搜索点击数据训练模型。搜索日志数据量非常大且容易获取，搜索点击是一种弱监督的数据，包含用户对 query 和商品相关性的认可，虽然包含很多噪声，但是数据量大的情况下模型有能力学会忽略这些噪音，反而有可能增加模型的稳健性。所以我们的训练数据（Q，P）就是（query，goods_info），goods_info 可以只是简单的使用商品标题，也可以加入其他信息如店铺名，商品类型，商品描述等等。</p>
-
-<p>模型设计为经典的双塔结构，由于商品搜索点击的 query 和 goods_info 分布上很接近，所以双塔的结构和参数完全共享，也就是一个塔用两次。</p>
-
-<p><img src="https://tech.youzan.com/content/images/2022/07/Snipaste_2022-07-07_16-06-45.png" alt="对比学习在有赞的应用"></p>
-
-<p>当 goods_info 包含商品标题外的其他信息时，使用 segment_id 区分。这里我们输入的序列长度是 100，embedding 维度为 512，6 层 Transformer encoder layer，总参数量 17M，只使用 6 层 transformer 是基于线上服务性能考虑，独占单卡，100 并发，可以达到 60ms 的 RT 和 1500 的 QPS，且现有两层 transformer 的模型表现也不错，6 层目前来说是比较经济的选择。</p>
-
-<h2 id="4">4. 训练技巧</h2>
-
-<h3 id="41">4.1 温度超参</h3>
-
-<p>infoNCE 相对于 crossEntropy 多出来的温度超参 τ，按照<a href="https://arxiv.org/abs/2012.09740">Understanding the Behaviour of Contrastive Loss</a> 中的解释，具有控制表示分布的能力，小的温度超参学习出来的分布更加均匀，大的温度超参学习出来的分布类间更加远离，如下图：</p>
-
-<p><img src="https://tech.youzan.com/content/images/2022/06/Snipaste_2022-06-21_17-37-50.png" alt="对比学习在有赞的应用"></p>
-
-<p>CLIP 中将温度超参设置为可学习的参数，我们也曾尝试过，但是模型学习到最后，为了 loss 继续降低，会 “偷懒” 将温度参数设置的很小，之前训练得到过 0.0037 这么小的温度参数，当模型有分辨能力后，过小的温度超参会阻碍模型表示能力的进一步提高，如下图所示，所以最终训练时，我们还是使用了常数 0.1 作为温度超参的值。</p>
-
-<p><img src="https://tech.youzan.com/content/images/2022/06/Snipaste_2022-06-21_17-38-20.png" alt="对比学习在有赞的应用"></p>
-
-<h2 id="42">4.2 分布式训练</h2>
-
-<p>由于对比学习对负样本的依赖，理论上负样本越多模型的表示能力越稳健，使用 batch 内负采样的技术需要增加 batch_size 以增加负样本数量，而 batch_size 的大小受限于显卡的显存。那既然一张卡的显存有限，使用多个机器的多张卡一起训练呢？不仅可以增加 batch_size，还能提高训练速度，于是我们设计了多机多卡的训练方案，如下图所示：</p>
-
-<p><img src="https://tech.youzan.com/content/images/2022/06/-------_--_----_-----3-2.png" alt="对比学习在有赞的应用"></p>
-
-<p>这里以三个节点为例，每个节点为一台单卡的机器，当模型前向计算出 goods_embedding 和 query_embedding 时，对于单机就可以直接计算相似度矩阵了，但是为了获得更大的相似度矩阵，我们使用 all_gather 操作，将其他节点的 goods_embedding 和 query_embedding 收集过来，拼成更大的 embedding 矩阵再计算相似度，原来单机的相似度矩阵维度为（batch_size， batch_size），这里分布式的相似度矩阵会增加为（batch_size * num_node，batch_size * num_node），如果单机最大 batch_size 是 500，三台分布式训练 batch_size（all_gather 后）就可以达到 1500。只要增加节点就可以增加负样本数量，分布式训练看起来挺适合对比学习。</p>
-
-<p>实际训练时我们使用 5 台机器做分布式训练，将训练数据切分为 5 份，每台机器读取一份，训练框架使用 Pytorch Lightning。</p>
-
-<h2 id="43">4.3 一些节省显存的技巧</h2>
-
-<p>分布式训练靠多台机器增加 batch_size，单节点的 batch_size 可以靠优化模型训练时的显存占用提高。根据<a href="https://arxiv.org/abs/1910.02054">ZeRO</a> 里的说明，模型在 GPU 上训练时，显存中会存在模型的参数、各层的激活值、优化器的状态、梯度等，要减少显存占用就要想办法优化这些数据的显存开销。</p>
-
-<h3 id="431zero">4.3.1 ZeRO</h3>
-
-<p>ZeRO 就是基于分布式提出的节省单节点显存的方案，一般分布式每个节点都存储着完整的模型数据（模型参数、优化器的状态、模型的梯度、前向计算的激活值等），如果将优化器的状态参数拆分，保存在每个节点上，每个节点只维护部分参数，那单个节点的显存占用会显著下降，同样的，梯度，参数都分布式保存，显存占用会极大的得到优化。</p>
-
-<p><img src="https://tech.youzan.com/content/images/2022/06/Snipaste_2022-06-21_17-40-29.png" alt="对比学习在有赞的应用"></p>
-
-<p>我们使用 Pytorch Lightning 中的 ddp_sharded，即将优化器的状态参数和模型的梯度分布式保存在每个节点上，详细说明参见<a href="https://pytorch-lightning.readthedocs.io/en/latest/advanced/model_parallel.html#sharded-training">官方文档</a>。</p>
-
-<h3 id="432activationcheckpointing">4.3.2 Activation Checkpointing</h3>
-
-<p>Activation Checkpointing 也叫 Gradient Checkpointing 或者重计算技术。模型训练前向计算时，每层的计算结果（激活值）都会保存，方便反向传播时更新梯度，当 batch_size 增加时，其占用的显存将非常大，而 Activation Checkpointing 的思想就是部分层的计算结果不保存，当反向传播到这层时，重新前向计算这一层的激活值，再进行梯度更新，会增加一些训练时间，但是可以节省很多显存，如图，反向传播要等重计算完成：</p>
-
-<p><img src="https://tech.youzan.com/content/images/2022/06/output_poor.gif" alt="对比学习在有赞的应用"></p>
-
-<p>根据网上的测试，使用 Activation Checkpointing 可以减少约 60% 的显存占用，同时增加约 25% 的训练时间，这对显存紧张的我们来说无疑是很划得来的。而且很重要的一点是，<a href="https://qywu.github.io/2019/05/22/explore-gradient-checkpointing.html">对模型训练的精度没有影响</a>：</p>
-
-<p><img src="https://tech.youzan.com/content/images/2022/06/Snipaste_2022-06-21_17-41-37.png" alt="对比学习在有赞的应用"></p>
-
-<p>陈天奇大佬 2016 年提出了这个方法，那个时候 BERT 还没出呢，详细见大佬论文<a href="https://arxiv.org/abs/1604.06174">Training Deep Nets with Sublinear Memory Cost</a> 。</p>
-
-<p>我们的模型开发由 Tensorflow 迁移到 Pytorch，也有 Pytorch 官方自带这个功能<a href="https://pytorch.org/docs/stable/checkpoint.html">torch.utils.checkpoint.checkpoint</a> 的原因，不过需要尽量避免重算 dropout 层。具体实现时，我们继承 TransformerEncoderLayer 类，将 MultiheadAttention 层改为允许重计算的层。</p>
-
-<h3 id="433mixedprecision">4.3.3 Mixed Precision</h3>
-
-<p>混合精度训练（<a href="https://arxiv.org/abs/1710.03740">Mixed Precision Training</a>）是指模型训练时，模型权重和激活值以 FP16 存在，在有 Tensor Core 的 GPU 上可以加速，FP16 也可以节省显存。虽然在前向和反向传播时使用 FP16，但在更新权重的时候还会使用 FP32。</p>
-
-<p><img src="https://tech.youzan.com/content/images/2022/06/Snipaste_2022-06-21_17-42-20.png" alt="对比学习在有赞的应用"></p>
-
-<p>实际测试中，大约可以节省 30% 的显存，节约 50% 的训练时间。</p>
-
-<h3 id="434">4.3.4 训练配置</h3>
-
-<p>使用上面提到的这些优化显存占用的方法，单卡显存占用可以节约 55%，16G 显存的 GPU 可以放下 700 的 batch_size，5 个节点，最终计算对比损失时的 batch_size 可以达到 3500。（但是要注意 batch_size 也不是越大越好，当你的训练数据多样性不足而 batch_size 较大时，会引入较多 False Negative，即其他 Q 的 P 与当前 Q 也是语义上相近的，但是计算 loss 时却是当作负样本处理的，有点类似于做分类时有类别重复）</p>
-
-<p>我们总共收集 184M 的搜索点击加购日志，5 台 GPU 机器分布式训练，计算 loss 的相似度矩阵大小是 3500 * 3500，温度超参为 0.1。</p>
-
-<h2 id="5">5. 效果</h2>
-
-<p>我们提前整理了一个产品词词库，用来做向量匹配，来看一下效果：</p>
-
-<p><img src="https://tech.youzan.com/content/images/2022/07/Snipaste_2022-07-07_16-32-37.png" alt="对比学习在有赞的应用"></p>
-
-<p>只要商品标题里出现了产品词，预测起来是比较容易的，标题中出现多个产品词时，模型也有能力找出最合适的那个（不过也有 badcase，比如 “足浴盐”），当标题中没有产品词时，也可以通过向量匹配的方式找一个合理的产品词，这是之前的 NER 方案完全不能处理的。而且可以通过卡阈值的方式找出词库中语义相近的产品词。</p>
-
-<p>用来匹配文案效果也不错：
-<img src="https://tech.youzan.com/content/images/2022/07/Snipaste_2022-07-07_15-02-01.png" alt="对比学习在有赞的应用"></p>
-
-<p>而且测试还发现，属性信息也被编码进了表示中，可以区分品牌、颜色、男女、季节等。</p>
-
-<p>再来一个更有挑战的任务：匹配类目。由于类目文本的形式是：一级类目名 &gt; 二级类目名 &gt; 三级类目名 &gt;... 这种形式与搜索词和商品标题偏差较大，正好可以测试一下模型的泛化能力：
-<img src="https://tech.youzan.com/content/images/2022/07/Snipaste_2022-07-07_15-01-19.png" alt="对比学习在有赞的应用"></p>
-
-<p>可以看出就算类目文本和训练数据分布不一致，模型也有能力做出预测，叶子类目预测的效果也超出预期，这是 Zero-shot 的效果，非常令人兴奋。想想之前如果要做文本分类，我们需要标注大量数据，加上类目体系庞大，要取得好的效果需要花费大量资源，有了对比学习，就不用从 0 分学起了，上来就是 60 分，只需要少量的标注数据，就可以达到令人满意的效果。人工智能终于可以不用那么人工了，大数据的优势也体现出来了。</p>
-
-<p>商品文本编码可以使用商品搜索日志训练，类似的，图像的编码器可以通过商品标题与商品图片的相关性学习出来。至此，我们就拥有了商品文本和图像各自的编码器，可以做文本和文本的匹配，文本和图像的匹配，图像和图像的匹配。</p>
-
-<p>图文匹配的 CLIP 模型已经开源，可以在这里找到 <a href="https://huggingface.co/youzanai/clip-product-title-chinese">https://huggingface.co/youzanai/clip-product-title-chinese</a></p>
-
-<h2 id="6">6. 应用</h2>
-
-<p>基于对比学习预训练加微调和向量召回的方案，目前已经在有赞的商品产品词预测、商品类目预测、相似商品推荐、搜索召回、搜索排序、智能文案、商品风控等场景上线使用，稳健性都要好于之前纯有监督的方案。</p>
-
-<p>可以说，有了对比学习这个强力工具，以前做不了的都可以做了，思路都打开了。对比学习，真的大有可为。</p>]]></content>
-      <categories>
-        <category>编程</category>
-      </categories>
-      <tags>
-        <tag>有赞技术</tag>
-        <tag>大数据</tag>
-        <tag>机器学习</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>有赞算法平台之模型部署演进</title>
-    <url>/2022/06/21/%E6%9C%89%E8%B5%9E%E7%AE%97%E6%B3%95%E5%B9%B3%E5%8F%B0%E4%B9%8B%E6%A8%A1%E5%9E%8B%E9%83%A8%E7%BD%B2%E6%BC%94%E8%BF%9B/</url>
-    <content><![CDATA[<blockquote>
-<p>原文链接：<a href="https://tech.youzan.com/you-zan-suan-fa-ping-tai-zhi-mo-xing-bu-shu-yan-jin/">https://tech.youzan.com/you-zan-suan-fa-ping-tai-zhi-mo-xing-bu-shu-yan-jin/</a></p>
-</blockquote>
-<h1 id="">一、 前言</h1>
-
-<p>模型部署作为算法工程落地的最后一公里，其天然对算法团队而言具有较高的复杂性，不仅要考虑如何高效地部署、管理不同框架模型，还需要考虑分布式服务的负载均衡、故障容错、可扩展性、资源隔离、限流、核心指标监控等问题。 这些都极大的依赖于工程团队的能力，不是算法团队的强项，如何解决这最后一公里，让焦点聚焦在模型开发上，是模型部署服务模块需要解决的问题。
-<img src="https://tech.youzan.com/content/images/2021/12/pic_1-1-2.png" alt="alt"></p>
-
-<h1 id="">二、 原有架构</h1>
-
-<h2 id="21">2.1 架构设计</h2>
-
-<p>在有赞算法平台 Sunfish 包含算法训练和模型部署两部分， 模型部署的模块称为 ABox（小盒子）。
-<img src="https://tech.youzan.com/content/images/2021/12/image-1297.png" alt="alt"></p>
-
-<p>ABox 主要提供将模型部署为在线服务的功能， 主要包含以下功能： <br>
-1. 提供 tensorflow 模型的服务加载和版本管理、弹性部署 <br>
-2. 提供 tensorflow 模型和其他模型服务（自己部署在额外服务器上）的路由管理 <br>
-3. 提供模型输入和输出的自定义处理逻辑执行 <br>
-4. 提供服务主机的负载均衡管理 <br>
-5. 收集的 Metric 写入上报到 kafka，通过 druid 做监控，并提供指标界面查询</p>
-
-<p>其整体的架构设计如下图所示分为 3 个模块: master、 worker 和 manager， 各自主要职责为：
-<img src="https://tech.youzan.com/content/images/2021/12/image-1273.png" alt="alt">
-<strong>master：</strong></p>
-
-<ol>
-<li>业务请求的路由 <br>
-根据 zookeeper 上的动态路由选择将请求直接路由给可以访问的服务（这里包括 TF-Serving 服务和第三方注册 REST 服务，多个服务之间采用轮询的方式）, 请求不会经过 worker。</li>
-<li>自定义 jar 包（udl: user defined lib）执行 <br>
-在模型预测前和预测后可以加载自定义处理逻辑，可以对模型的输入数据和输出数据进行预处理</li>
-</ol>
-
-<p><strong>worker:</strong></p>
-
-<ol>
-<li>注册本机信息，负责上报心跳给 manager, 心跳包含本机上的算法服务的健康状态  </li>
-<li>负责算法模型的本地拉取， 由 tf-serving 服务加载模型</li>
-</ol>
-
-<p><strong>manager:</strong></p>
-
-<ol>
-<li>负责服务器（master 和 worker）的注册和下线  </li>
-<li>负责算法和模型的创建  </li>
-<li>提供 udl 的更新接口  </li>
-<li>提供集群、业务组管理的接口  </li>
-<li>提供模型的部署和上下线功能  </li>
-<li>提供第三方算法的注册和上下线功能</li>
-</ol>
-
-<h2 id="22">2.2 痛点问题</h2>
-
-<p>基于以上架构，ABox 能较好的支持 tensorflow cpu 模型的部署，但存在以下问题：</p>
-
-<p><strong>痛点 1 运维投入大</strong></p>
-
-<ul>
-<li>扩缩容需要人工调用接口</li>
-<li>模型服务最多实例个数取决于 worker 节点个数， 横向扩容需要增加机器</li>
-<li>除 tensorflow 模型部署， 其他需要人工调用接口注册 URL 到 master 来提供路由能力</li>
-<li>tfserving 采用容器化部署，模型加载过多易 OOM，无法自动拉起</li>
-</ul>
-
-<p><strong>痛点 2 负载不均衡</strong></p>
-
-<ul>
-<li>模型按照一定的资源调度策略分布在各个 worker 节点上，各 worker 节点资源使用容易不均衡</li>
-</ul>
-
-<p><strong>痛点 3 资源未隔离</strong></p>
-
-<ul>
-<li>热点模型占用大量的 CPU / 内存，容易影响其他模型服务</li>
-</ul>
-
-<p><strong>痛点 4 缺乏通用性</strong></p>
-
-<ul>
-<li>模型服务无法统一管理， tensorflow 模型和其他框架模型管理割裂</li>
-<li>没有 GPU 模型服务部署功能</li>
-</ul>
-
-<h1 id="">三、 改造升级</h1>
-
-<h2 id="31seldon">3.1 seldon 介绍</h2>
-
-<p>基于前述问题，为了统一不同框架模型部署服务的管理， 为了增加 cpu 和 gpu 模型的统一部署功能， 为了简化运维操作，我们引入了 seldon 这个开源的基于云原生的模型部署服务。
-seldon 是一个基于 K8S 的集成的模型部署方案， 内置了很多通用的例如 tfserving、  sklearn server、mlflow server、triton 这样的模型推理服务器 (inference server)。 除了这些还可以通过自己实现自定义的 inference server 提供一些额外的模型服务支持。通过将你的模型部署为 K8S 上的微服务，来提供 HTTP / GRPC 接口给业务调用。 <br>
-我们来看下 seldon 的核心模块， 如下图所示。seldon 的核心模块是它的 Seldon Core Controller, 即 operator 模块， 该模块用来管理 Seldon Deployment 资源 (Custom Resource)。 seldon 通过 CRD 向 K8S 注册自定义资源，Seldon Core Controller 负责处理该资源的 CRUD， 我们通过创建/删除/修改 Seldon Deployment 来达到创建/删除/修改模型服务的目的。 
-除此之外， seldon 还可以集成 Prometheus 和 Jaeger 来提供模型服务的指标监控和调用追踪能力。
-<img src="https://docs.seldon.io/projects/seldon-core/en/latest/_images/e2e-model-serving.svg" alt="alt">
-seldon 的另一核心概念是 Model Server , 即加载模型用来提供 HTTP 接口的模型推理服务器。Model Server 有两种类型， 分为 Reusable Model Servers 和 Non-Reusable Model Servers 。 他们的差别从名字就可以看出， 前者是不同模型之间可复用的，后者是固定模型的。 <br>
-Reusable Model Servers 通过配置的模型地址，从外部的模型仓库下载模型， seldon 模型预置了较多的开源模型推理服务器， 包含 tfserving , triton 都属于 Reusable Model Servers。 <br>
-Non-Resuable Model Servers 将模型打入自定义镜像内部，不需要单独从外部加载模型， 适合做一些特殊化处理以及不需要频繁更新的场景。 <br>
-<img src="https://docs.seldon.io/projects/seldon-core/en/latest/_images/model-servers.svg" alt="alt"></p>
-
-<p>例如启动一个 tensorflow 的模型服务， mnist.yaml 文件定义如下：</p>
-
-<pre><code>apiVersion: machinelearning.seldon.io/v1alpha2  
-kind: SeldonDeployment  
-metadata:  
-  name: tfserving
-spec:  
-  name: mnist
-  predictors:
-  - graph:
-      children: []
-      implementation: TENSORFLOW_SERVER
-      modelUri: gs://seldon-models/tfserving/mnist-model
-      name: mnist-model
-      parameters:
-        - name: signature_name
-          type: STRING
-          value: predict_images
-        - name: model_name
-          type: STRING
-          value: mnist-model
-    name: default
-    replicas: 1
-</code></pre>
-
-<p>这里声明一个名为 minist 的 SeldonDeployment 资源，主要的配置参数就是 implementation 和 modelUri。 implementation 指定此次 Model Server 使用预置的 tfserving 服务器， 并且需要指定模型的 modelUri 地址。
-通过 <code>kubectl create -f mnist.yaml</code> 我们就可以创建一个 Seldon Deployment 资源。
-通过 <code>kubectl get sdep</code> 可以看到的 Seldon Deployment <code>minist</code>。 
-该 Seldon Deployment 资源会管理对应的所需要的 Deployment、 Service 和 Virtual Service。</p>
-
-<h2 id="32">3.2 设计方案</h2>
-
-<p>基于公司内部 K8S 环境，在商量了如何部署 seldon 的后，我们最后决定的架构如图所示：
-<img src="https://tech.youzan.com/content/images/2021/12/image-1322.png" alt="alt"></p>
-
-<p>在引入 seldon 管理模型服务部署的同时，进行了以下的改造： </p>
-
-<ol>
-<li>保留 ABox master 作为 Dubbo 请求接入入口， master 负责将请求根据协议封装成 http 请求 K8S 集群的 ingress controller。  </li>
-<li>修改 Ingress Controller 为 Nginx Ingress Controller， 通过为每个模型服务生成 Ingress 规则路由到指定的 K8S service。  </li>
-<li>增加 HDFS-Intializer 用于 Reusable Model Server 中的 hdfs:// 协议的 modelUri  </li>
-<li>基于腾讯云的 GpuManager 方案实现 GPU 的虚拟化和共享  </li>
-<li>通过在算法平台集成 K8S client 进行 Seldon Deployment 和 Ingress 的 CRUD  </li>
-<li>为自定义镜像提供日志收集服务  </li>
-<li>为模型服务增加资源使用展示</li>
-</ol>
-
-<p>下面来介绍下主要的部分。</p>
-
-<h3 id="311ingresscontroller">3.1.1 Ingress Controller 替换</h3>
-
-<p>seldon 通过 Ingress Controller 来提供集群外服务的统一访问， 然后通过 istio 或者 ambassador 提供服务的路由和分流， 默认的 istio 服务较为强大，但由于公司内部 K8S 不提供 istio 服务的维护，为了便于运维， 我们在部署 seldon operator 的时候关闭了 istio 和 ambassador 的功能。然后通过自己的客户端实现在 seldon deployment 和 ingress 的统一创建/删除/更新管理。</p>
-
-<h3 id="312reusablemodelserver">3.1.2 Reusable Model Server 模型初始化</h3>
-
-<p>seldon 的默认模型下载协议只支持 s3://、 gs://， 我们的模型文件目前存储于 HDFS 管理， 所以实现了自定义的 HDFS - INITILIZER 负责 HDFS 模型文件的拉取。</p>
-
-<h3 id="313gpu">3.1.3 GPU 方案</h3>
-
-<p>我们都知道在 k8s 上使用 GPU 资源有 NVIDIA 的 k8s device plugin ，但是这种方案的缺点是不支持GPU 的共享和隔离， 也就是一个 pod 的 container 必须占用整数个 GPU。在我们的实际使用中， 有一些小模型需要 GPU 加速但是只占用小部分显卡资源。 目前主流的方案有
-<img src="https://tech.youzan.com/content/images/2021/12/image-1377.png" alt="alt"></p>
-
-<p>由于公司使用的腾讯云并且 GpuManager 方案功能较强大，所以我们考察了腾讯云的开源 GpuManager 方案和腾讯云新升级的 vGpu 方案，在权衡后， 选择了 GpuManager。
-理由是：</p>
-
-<ol>
-<li>由于 vGpu 实现内核级别的 cuda 请求拦截，需要依赖腾讯自研的 TencentOS， 不利于服务器内部统一运维，另外 TencentOS 基于 Centos 8, 在公司目前普遍还是 Centos 7 的情况下， 无法安装基础监控服务，也不利于运维。  </li>
-<li>vGPU 在积极研发推进阶段，但是目前还不支持服务配置独占 N 张 GPU 卡的情况。</li>
-</ol>
-
-<p>虽然 GpuManager 满足功能需求，但是也存在约 5% 的性能损耗。</p>
-
-<h3 id="314">3.1.4 日志管理</h3>
-
-<p>对于自定义的镜像的模型服务， 我们定制了 cpu 和 gpu 版本 （主要支持 pytorch）的基础镜像，通过在基础镜像内置 databus (filebeat) 实现日志上传到 kafka, 再通过自研 log-server 服务消费 kafka 写入日志文件，并且对日志文件进行定期清理，备份到 HDFS。
-log-server 提供了 HTTP 的访问接口可以获取到最新的日志。</p>
-
-<h3 id="314">3.1.4 资源监控</h3>
-
-<p>通过定时收集每个 pod 的 cpu, memory 使用量， 我们粗略的统计了每个服务的最小/最大/平均资源使用情况， 并且在界面提供实时资源使用的展示。
-<img src="https://tech.youzan.com/content/images/2021/12/image-1420.png" alt="alt"></p>
-
-<h3 id="315">3.1.5 服务迁移</h3>
-
-<p>在完成基本功能开发后， 我们依次对 QA、预发、生产环境进行了已有的模型服务的迁移， 这个过程比较长。
-为了不影响生产的模型服务， 我们定制了流量切换开关， 逐步按比例切流线上服务到新的集群， 保证业务调用无痛无感知。目前已基本完成线上服务的切流。
-<img src="https://tech.youzan.com/content/images/2021/12/image-1347.png" alt="alt"></p>
-
-<h2 id="33">3.3 注意点</h2>
-
-<p><strong>tfserving 依赖 avx 指令集</strong></p>
-
-<p>在某些 KVM 虚机上无法启动 tfserving 服务， Container 提示状态为 CrashLoopBackOff。 进入容器直接运行 <code>/usr/bin/tensorflow_model_server --port=9000 --model_name=xxx --model_base_path=/path/to/model</code> 可以看到错误输出</p>
-
-<pre><code>Illegal instruction (core dumped)  
-</code></pre>
-
-<p>tfserving 默认需要 avx 、avx2 的支持, 可以通过 lscpu 检查机器支持的对应指令集。</p>
-
-<h1 id="">四、 总结与展望</h1>
-
-<p>第一阶段模型服务改造已经告一段落，我们具备了通用化的模型部署能力， 并且依托于 K8S 简化了运维。但是目前模型服务部署仍有更多的优化点， 比如：</p>
-
-<ol>
-<li>支持推理图 <br>
-我们目前的模型服务为单模型的服务， seldon 支持更复杂的图推理的结果， 可以在模型服务前后配置 INPUT TRANSFORMER 和 OUTPUT TRANSFORMER 进行输入输出的处理</li>
-<li>支持多种发布策略、分流策略 <br>
-支持灰度发布可以更为稳妥的支持线上模型在线推理服务的更新， 分流策略的支持可以用来衡量多版本模型之间的性能差异和效果比对</li>
-<li>支持自定义 Model Server 镜像的自动打包更新  </li>
-<li>支持更多模型 intializer <br>
-如对象存储的支持</li>
-</ol>]]></content>
-      <categories>
-        <category>编程</category>
-      </categories>
-      <tags>
-        <tag>有赞技术</tag>
-        <tag>大数据</tag>
-        <tag>bigdata</tag>
       </tags>
   </entry>
   <entry>
@@ -2266,502 +1072,1127 @@ log-server 提供了 HTTP 的访问接口可以获取到最新的日志。</p>
       </tags>
   </entry>
   <entry>
-    <title>浅谈有赞搜索 QP 架构设计</title>
-    <url>/2022/09/05/%E6%B5%85%E8%B0%88%E6%9C%89%E8%B5%9E%E6%90%9C%E7%B4%A2QP%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/</url>
+    <title>8 点 1 氪丨 A 股第 4 只两千元股诞生；问界回应浙江台州 M9 事故；马斯克个人财富将突破万亿美元</title>
+    <url>/2026/06/03/8%E7%82%B91%E6%B0%AA%E4%B8%A8A%E8%82%A1%E7%AC%AC4%E5%8F%AA%E4%B8%A4%E5%8D%83%E5%85%83%E8%82%A1%E8%AF%9E%E7%94%9F%EF%BC%9B%E9%97%AE%E7%95%8C%E5%9B%9E%E5%BA%94%E6%B5%99%E6%B1%9F%E5%8F%B0%E5%B7%9EM9%E4%BA%8B%E6%95%85%EF%BC%9B%E9%A9%AC%E6%96%AF%E5%85%8B%E4%B8%AA%E4%BA%BA%E8%B4%A2%E5%AF%8C%E5%B0%86%E7%AA%81%E7%A0%B4%E4%B8%87%E4%BA%BF%E7%BE%8E%E5%85%83/</url>
     <content><![CDATA[<blockquote>
-<p>原文链接：<a href="https://tech.youzan.com/11/">https://tech.youzan.com/11/</a></p>
+<p>原文链接：<a href="https://36kr.com/p/3838091144464644?f=rss">https://36kr.com/p/3838091144464644?f=rss</a></p>
 </blockquote>
-<h1 id="">一、有赞搜索平台整体设计</h1>
-
-<p>  在介绍 QP 前先简单介绍一下搜索平台的整体结构，方便大家快速了解 QP 在搜索平台中的作用。下图简单展示了一个搜索请求开始到结束的全部流程。业务通过简洁的 api 接入 los，管理员在搜索平台新建配置并下发，完成整个搜索接入，并通过 abtest 验证 QP 带来的优化效果。   </p>
-
-<p><img src="https://tech.youzan.com/content/images/2022/09/1-----.jpeg" alt="image"></p>
-
-<h1 id="qp">二、QP 的作用</h1>
-
-<p>   在 NLP 中，QP 被称作 Query 理解（QueryParser），简单来说就是从词法、句法、语义三个层面对 query 进行结构化解析。这里 query 从广义上来说涉及的任务比较多，最常见的就是搜索系统中输入的查询词，也可以是 FAQ 问答或阅读理解中的问句，又或者可以是人机对话中用户的聊天输入。 <br>
-  在有赞，QP 系统专注对查询内容进行结构化解析，整合了有赞 NLP 能力，提供统一对外接口，与业务逻辑解耦。通过配置化快速满足业务接入需求，同时将算法能力插件化，并支持人工干预插件执行结果。 <br>
-  以精选搜索为例，当用户输入衣服时用户往往想要搜的是衣服类商品，而不是衣服架，衣服配饰等衣服周边用品。通过将衣服类目进行加权，将衣服类的商品排在靠前的位置，优化用户搜索体验。
-<img src="https://tech.youzan.com/content/images/2022/09/-----2.jpg" alt="image">
-  QP 目前应用在新零售，微商城、精选、爱逛买手店、分销市场、帮助中心知识库、官网搜索等场景，通过类目加权，产品词识别，搜索词纠错，同近义词召回提升用户搜索效果。</p>
-
-<h1 id="qp">三、QP 应用整体设计</h1>
-
-<p><img src="https://tech.youzan.com/content/images/2022/09/3-QP------.jpeg" alt="image">
-  上图完整描述了 QP 请求流程和配置流程的执行情况。当搜索请求到达 QP 时，根据请求体中的场景标记获取 QP 配置。QP 配置中包含搜索词位置标记，插件列表，dsl 改写脚本等内容。 <br>
-  QP 根据配置，按序执行相应插件。插件在执行后，可通过干预配置以及超参数对结果进行人工干预。 <br>
-  QP 在获取到算法插件执行结果后，根据改写配置，对搜索 dsl 进行改写。如将纠错词放置在搜索词同一层级，将 dsl 改写成 fuction score 结构进行类目加权。</p>
-
-<h1 id="qp">四、QP 应用分层设计</h1>
-
-<p><img src="https://tech.youzan.com/content/images/2022/09/4-QP------.jpeg" alt="image">
-上图按照请求流程从上到下展示了 QP 的分层设计，接下来将简单描述各层作用： <br>
-<strong>controller 层</strong>：查询改写服务入口，对请求做预处理。 <br>
-<strong>service 层</strong>：根据场景获取 QP 改写配置，获取 dsl 里的搜索词，调用相应的插件返回 qp 结果。 <br>
-<strong>plugin 层</strong>：负责算法插件执行，调用插件对应的算法实现 handler，对算法结果做干预并针对调用成功或者失败做处理。 <br>
-<strong>handler 层</strong>：算法具体实现放置在该层，该层会依赖各种算法服务（如小盒子，Milvus 等）。 <br>
-<strong>Intervener 层</strong>：负责对 handler 结果做人工干预。 <br>
-<strong>processor 层</strong>：根据 QP 改写配置，调用改写插件，完成 dsl 的改写。</p>
-
-<h2 id="qp">五、QP 算法插件设计</h2>
-
-<h3 id="51preprocess">5.1 预处理 Preprocess 插件</h3>
-
-<p>  按照配置规则对搜索词进行预处理，预处理方式如下： <br>
-  * 删除特殊符号 " “ \ 等； <br>
-  * 大写转小写，全角转半角； <br>
-  * 连续英文联合切分，连续数字联合切分，其余单独切分； <br>
-  * 默认截取 list 前 50 个字 / 词； <br>
-  * 将 list 拼接成一个字符串。  </p>
-
-<h4 id="">样例</h4>
-
-<pre><code>输入："史蒂夫新款\时尚套装夏修身圆领百搭钩花DWF镂空雪纺两件套套裙；"
-输出："史蒂夫新款时尚套装夏修身圆领百搭钩花dwf镂空雪纺两件套套裙"
-</code></pre>
-
-<h3 id="52correction">5.2 纠错 Correction 插件</h3>
-
-<p>  纠错插件的作用是对搜索词中错误内容进行识别，返回正确内容。</p>
-
-<h4 id="">样例</h4>
-
-<pre><code>输入：[上海牛黄皂]
-输出：[上海硫磺皂]
-</code></pre>
-
-<p>  当用户输入 “上海牛黄皂” 时，通过纠错插件能正确输出 “上海硫磺皂”，其技术架构如下图所示。
-<img src="https://tech.youzan.com/content/images/2022/09/5-----.jpeg" alt="image">
-1、纠错模型在 bert 基础上采用知识蒸馏，提升模型精度降低模型时延。 <br>
-2、根据同音字召回候选集，使用 tri-gram 语言模型对候选集排序。</p>
-
-<h3 id="53tokenizer">5.3 细粒度分词 Tokenizer 插件（基础分词）</h3>
-
-<h4 id="">样例</h4>
-
-<pre><code>输入：[雪地靴女2020年新款皮毛一体冬季加绒加厚防滑东北厚底保暖棉鞋子]
-输出：[雪地 靴 女 2020 年 新款 皮毛 一体 冬季 加绒 加厚 防滑 东北 厚底 保暖 棉 鞋子]
-</code></pre>
-
-<p>  该分词插件由 Java 版结巴 jieba-analysis 修改而来，修改内容如下： <br>
-  *   从全网商品标题数据，有赞行业数据，开源数据中统计出词频，作为基础分词词典； <br>
-  *   解决词典中由英文单词导致英文字符串被分开的问题； <br>
-  *   限制 DAG 的长度，即匹配词的长度，以此控制分词粒度，目前默认是 2，分出来的词除英文和数字外，长度不会超过 2。</p>
-
-<h3 id="54sementicsegment">5.4 语义分词 sementicSegment 插件</h3>
-
-<h4 id="">样例</h4>
-
-<pre><code>输入：[雪地 靴 女 2020 年 新款 皮毛 一体 冬季 加绒 加厚 防滑 东北 厚底 保暖 棉 鞋子]
-输出：[雪地靴 女 2020年 新款 皮毛一体 冬季 加绒加厚 防滑 东北 厚底 保暖 棉鞋子]
-</code></pre>
-
-<p>  该插件在细粒度分词的基础上，通过模型生成语义树将关联度大的词列表进行合并，输出语义分词结果。在样例中，雪地与靴关联度更大，所以在语义分词中将雪地与靴合并输出。</p>
-
-<h3 id="55tagging">5.5 实体识别 Tagging 插件</h3>
-
-<h4 id="">样例</h4>
-
-<pre><code>输入：["汽车","脚垫","刷子"]
-输出：[{"word":"汽车","tag":"产品修饰词"},{"word":"脚垫","tag":"产品修饰词"},{"word":"刷子","tag":"产品词"}]
-</code></pre>
-
-<p>  实体识别插件主要用于识别出搜索内容中的产品词。比如用户在输入 “汽车脚垫刷子” 时，如果没有做产品词识别，“脚垫” 相关的商品会因为商品分高而排在 “刷子” 商品前面，影响用户搜索体验。 <br>
-  反之，经过命名实体识别，对 “刷子” 做产品词提权，刷子类商品就可以排在脚垫类商品前面，优化搜索体验。 <br>
-  目前有赞规划的实体类别列表如下所示：</p>
-
-<pre><code>产品词 eg：“修身连衣裙”中的“连衣裙”
-产品修饰词 eg：“汽车脚垫”中的“汽车”
-普通词
-新词
-修饰
-品牌
-机构实体
-地点地域
-材质
-人名
-功能功效
-专有名词
-影视名称
-型号
-文娱书文曲
-系列
-游戏名称
-款式元素
-颜色
-场景
-风格
-营销服务
-人群
-时间季节
-性别
-类目
-母婴
-规格
-新品
-前缀
-后缀
-数字
-符号
-</code></pre>
-
-<h4 id="">实体识别方法</h4>
-
-<p>  <strong>基于正则</strong>可以识别数字、符号、规格、时间季节。</p>
-
-<pre><code>// 数字
-private numWordRegex = "[0-9]+";  
-// 符号
-private String symbolWordRegex = "[\\[\\]\\{\\}【】「」\\\\\\|、｜‘'\"“”’；：;:&gt;.。》/？\\?&lt;《，,~`·！\\!@#\\$¥%\\^…&amp;\\*（\\(\\)）\\-_—=\\+\\s]+";  
-// 规格
-private String unitRegex = "(?:\\d+|\\d+\\.\\d+|[一二三四五六七八九十百千万]+)\\s*(?:m|米|cm|厘米|ml|毫升|l|升|度|平米|件|块|元|片|张|本|条|瓶|部|辆|个|桶|包|盒|g|克|kg|千克|吨|寸|斤)";  
-// 时间季节
-private String seasonRegex = "[春夏秋冬]+[季天]?";  
-private String yearRegex = "(?:18|19|20)\\d{2}";  
-</code></pre>
-
-<p>  <strong>基于词库</strong>可以识别产品词、品牌、产品修饰词。  </p>
-
-<pre><code>品牌：query-&gt;二级类目-&gt;品牌，条件：在当前类目品牌词库里且模型预测不是“产品词”，此时打“品牌”实体标。    
-产品词：在产品词库且模型预测是普通词。   
-产品修饰词：多个词出现时，除最后一个，其余打“产品修饰词”实体标。  
-</code></pre>
-
-<p>  <strong>基于模型</strong>可以识别剩余 23 类实体，类别如下所示：</p>
-
-<pre><code>产品词
-普通词
-新词
-修饰
-品牌
-机构实体
-地点地域
-材质
-人名
-功能功效
-专有名词
-影视名称
-型号
-文娱书文曲
-系列
-游戏名称
-款式元素
-颜色
-场景
-风格
-营销服务
-人群
-时间季节
-</code></pre>
-
-<p>  模型结构：
-<img src="https://tech.youzan.com/content/images/2022/08/6-----.png" alt="image"></p>
-
-<h3 id="56categorypredict">5.6 类目预测 categoryPredict 插件</h3>
-
-<h4 id="">样例</h4>
-
-<pre><code>输入：牛奶绒
-输出: {
-        "categoryId": "101000010001",
-        "categoryName": "被套",
-        "categoryChainList": [
-            "家居建材",
-            "床上用品",
-            "被套"
-        ],
-        "parentCategoryId": "10100001",
-        "level": 3,
-        "hasChildren": true,
-        "percent": 0.9010684490203857
-    }
-</code></pre>
-
-<p>该插件会根据用户的搜索内容输出类目结果，主要应用在类目加权上。 <br>
-例如当用户在有赞精选上输入牛奶绒，期望返回牛奶绒床单。 <br>
-未使用类目加权，返回的商品大多为牛奶相关产品，不符合用户的搜索期望。 <br>
-使用类目加权后，将床上用品类产品提权，返回的商品牛奶绒床单，符合用户期望。 <br>
-类目预测模型是在对比学习基础上实现，具体内容可看<a href="http://tech.youzan.com/dui-bi-xue-xi-zai-you-zan-d/">对比学习在有赞的应用</a>   </p>
-
-<h3 id="57">5.7 同近义词插件</h3>
-
-<h4 id="">样例</h4>
-
-<pre><code>输入：[衬衣]
-输出：[衬衫]
-</code></pre>
-
-<p>  同近义词插件目前非常实现轻量，通过离线同义词表，搜索内容中的产品词作为输入，输出同义词。</p>
-
-<h1 id="">六、总结与展望</h1>
-
-<p>  本文从 QP 整体设计，分层设计，插件设计较为完整的介绍了 QP 的架构设计。目前经过一年多的迭代，QP 已经实现业务场景小时级接入，优化了零售，微商城，精选，爱逛，分销等场景搜索效果。后续将会继续丰富算法插件能力同时完成 QP 可视化配置能力方便业务自主接入。</p>
-
-<p>本文由吴鑫强，任艳萍负责收集整理。</p>]]></content>
+  <h2>今日热点导览</h2>
+  <ul>
+   <li>名创优品称会员买单仅限潮玩商品</li>
+   <li>谷歌扩大 Quick Share 与 AirDrop 互传适配范围，覆盖更多安卓机型</li>
+   <li>Meta 在全球范围扩大青少年内容管控</li>
+   <li>多家银行下架 3 年期 5 年期定期存款</li>
+  </ul>
+  <h2>TOP 3 大新闻</h2>
+  <p><strong>A 股第 4 只两千元股诞生，联讯仪器盘中股价冲破 2000 元</strong></p>
+  <p>6 月 3 日，联讯仪器盘中股价冲破 2000 元，最高达 2047.88 元。公司总市值超 2000 亿元。数据显示，自 A 股 1990 年 12 月 19 日开市以来，最高价曾突破 2000 元的股票屈指可数，仅有中安科、贵州茅台、云赛智联 3 只。这 3 只股票的上涨动因各异，长期市场表现也大相径庭。与 A 股史上前 3 只最高价曾触及 2000 元的股票相比，联讯仪器的硬科技成色鲜明。公司是全球少数、国内极少数量产供应 400G/800G/1.6T 光速光模块核心测试仪器的厂商，并已逐步在半导体测试设备领域形成 “第二增长曲线”。（上海证券报）</p>
+  <p><strong>问界回应浙江台州 M9 事故</strong></p>
+  <p>6 月 3 日，问界用户服务发布关于浙江省台州市车辆事故的说明：2026 年 6 月 3 日，一辆问界 M9 在浙江省台州市泽国镇发生事故，未造成人员伤亡。事故发生后，我们第一时间与用户取得联系，提供必要协助。</p>
+  <p>经现场确认，事故为车辆行驶过程中，撞击前车掉落的大块金属部件，造成强物理冲击并持续拖行一段时间后导致起火，目前火已扑灭。经初步调查，事发前车辆三电系统状态正常，且未见车辆其它自身异常，事故非车辆自身原因导致。（新浪汽车）</p>
+  <p><strong>马斯克个人财富将突破万亿美元，目前身家约为 8350 亿美元</strong></p>
+  <p>据《福布斯》，埃隆・马斯克 5 月身家增加 530 亿美元，在十大富豪中增幅排名第三。目前其身家约为 8350 亿美元。旗下电动汽车巨头特斯拉上月股价上涨 14%，但真正吸引投资者目光的是火箭与卫星业务公司 SpaceX。该公司上月提交上市文件，有望缔造史上规模最大的首次公开募股（IPO）。据悉，SpaceX 目标估值 1.8 万亿美元，略低于最初预期，但足以打破沙特阿美 2019 年创下的纪录，并有望推动马斯克个人身家突破万亿。预计股票最早会在 6 月 12 日开始交易，这意味着 2026 年 6 月可能成为全球诞生首位万亿富豪的月份。（新浪财经）</p>
+  <h2>AI 最前沿</h2>
+  <p><strong>DeepSeek 计划在首轮融资中募资约 70 亿美元</strong></p>
+  <p>知情人士透露，DeepSeek 计划在首轮融资中募资约 70 亿美元，这家人工智能初创企业估值将达到最高 590 亿美元。腾讯和宁德时代将成为 DeepSeek 最大的外部投资者；网易和京东也计划参与投资。（新浪财经）</p>
+  <p><strong>微软宣布面向新型 AI 设备推出 “Project Solara” 平台</strong></p>
+  <p>微软宣布面向新型 AI 设备推出 “Project Solara” 平台。芯片将运行 AI Agent 而非应用，并直接与云计算数据中心通信。（界面新闻）</p>
+  <p><strong>Anthropic 拓展其 AI 网络安全项目</strong></p>
+  <p>Anthropic 正著手拓展其网络安全项目，向新一批企业开放其 Claude Mythos Preview 的访问权限，以协助他们排查软件漏洞。（新浪财经）</p>
+  <p><strong>Kimi 发布桌面端产品 Kimi Work，定位通用型本地 Agent</strong></p>
+  <p>36 氪获悉，今日，Kimi 发布桌面端产品 Kimi Work，是一款面向知识工作者的通用型本地 Agent，可以在电脑上拆解任务、调用工具、使用浏览器、创建和整理文件夹，并完成文档、表格、PPT 等工作产物的交付。Kimi Work 由 Kimi Code 深度参与开发，支持 13 小时连续编码、300 个子 Agent 并行协作及 4000 余次自主工具调用。</p>
+  <h2>大公司 / 大事件</h2>
+  <p><strong>谷歌扩大 Quick Share 与 AirDrop 互传适配范围，覆盖更多安卓机型</strong></p>
+  <p>谷歌官网当地时间 6 月 2 日发布新闻稿宣布一系列当月更新的新功能，其中提及，谷歌宣布安卓 Quick Share（快速分享）兼容苹果 AirDrop（隔空投送）功能，可跨平台互传，现已适配更多设备。已经提供 Quick Share 功能的国产品牌机型包括小米 17T Pro、荣耀 Magic V6、OPPO Find X9 等。（财联社）</p>
+  <p><strong>31 条中日航线 5 月取消全部航班</strong></p>
+  <p>航班管家 DAST 最新统计显示，5 月共有 31 条中日航线取消全部航班，比 4 月取消数量有所增加。整个 5 月中国大陆赴日本共有 1592 个航班取消。（第一财经）</p>
+  <p><strong>多家银行下架 3 年期 5 年期定期存款</strong></p>
+  <p>民营银行加速下架三年期、五年期存款产品并下调利率，以应对净息差持续收窄压力，降低高成本负债。多家银行已暂停销售或显示 “售罄”，利率普遍下调至 1.9%—2.1% 区间。（21 世纪经济报道）</p>
+  <p><strong>名创优品称会员买单仅限潮玩商品</strong></p>
+  <p>近日，有消费者吐槽，名创优品不是会员不能买单&nbsp;。消费者称，自己在名创优品结账时被要求出示会员证明，如果不是会员就不能买单。记者针对该情况询问名创优品客服，对方表示，目前购买潮玩类商品需要会员，其他商品无需出示会员结账，“盲盒、搪胶毛绒公仔目前仅对名创优品会员开放购买，注册会员后即可正常下单，其他品类商品不受影响。”（中国新闻网）</p>
+  <p><strong>莲花 CEO 称超过 1.8 吨就是 “菜车”</strong></p>
+  <p>莲花跑车 CEO 冯擎峰近日在接受媒体采访时，提到跑车的车重问题，并给出了 1.8 吨的分水岭。</p>
+  <p>他表示，不管它马力多大，哪怕是 2000 匹马力，只要重量超过 1.8 吨，就是菜车。“我们也看到一些竞争对手，甚至于跑车做到了两吨，不可思议，说明它对跑车是没有理解的。”</p>
+  <p>此前，他还曾在采访中表示，不受控制的马力一文不值，马力大不代表就是性能车，受控的马力才叫性能车。电动化时代以后，马力容易获得了，往往容易忽视操控性。（新浪科技）</p>
+  <p><strong>腾讯 AI 产业应用大会在即，即将发布系列智能体应用新品</strong></p>
+  <p>36 氪获悉，据腾讯云官号账号信息，腾讯 2026AI 产业应用大会即将在北京举办。作为腾讯年度最重要的 AI 产品发布平台，此次将发布系列智能体应用新品，并将公布 infra 等基础设施升级新进展。与此同时，腾讯集团高级执行副总裁、云与智慧产业事业群 CEO 汤道生将于腾讯 AI 首席科学家姚顺雨同台对话，解读 AI 下半场腾讯在 AI 赛道的最新布局和思考。</p>
+  <p><strong>Meta 在全球范围扩大青少年内容管控</strong></p>
+  <p>Meta 周二披露，正对旗下 Instagram、脸书、Messenger 全球青少年账号扩容内容管控设置，保障未成年用户获取适配其年龄段的使用体验；当下各大社交平台因儿童身心健康与安全问题正面临日趋严苛的监管审视。（新浪财经）</p>
+  <p><strong>印度央行否认出售黄金的报道</strong></p>
+  <p>印度央行在声明中称，关于印度央行出售黄金的报道并不属实。截至目前，实物黄金储备仍为 880.52 吨，没有变化。此前有分析认为，印度央行可能为保护外汇储备而出售黄金。（财联社）</p>
+  <p><strong>马斯克关联空壳公司在休斯顿郊外购地，550 亿美元芯片厂或落地于此</strong></p>
+  <p>与马斯克有关联的一家空壳公司最近几周在美国休斯敦郊外一处乡村地区购置物业，表明这位亿万富豪可能在为一座计划中的 550 亿美元芯片厂 Terafab 敲定选址。Terafab 项目由 SpaceX、特斯拉和 xAI 联合推动，旨在为人工智能和机器人项目提供芯片支持，总投资最高可达 1190 亿美元。根据土地登记记录，这家名为 “WIT Tech LLC” 的公司已在格莱姆斯县购入至少 6 块地皮，总面积超过 6000 英亩（相当于近 10 平方英里），交易金额尚未披露。（财联社）</p>
+  <h2>上市进行时</h2>
+  <p><strong>星源材质通过港交所上市聆讯</strong></p>
+  <p>36 氪获悉，港交所文件显示，深圳市星源材质科技股份有限公司更新聆讯后资料集，意味着该公司港交所 IPO 通过聆讯。</p>
+  <p><strong>安克创新向港交所提交上市申请</strong></p>
+  <p>36 氪获悉，6 月 3 日，港交所文件显示，安克创新科技股份有限公司向港交所提交上市申请书，联席保荐人为中金公司、高盛、摩根大通。</p>
+  <p><strong>普渡机器人 CEO 称公司正在为香港上市做准备</strong></p>
+  <p>日经新闻报道称，普渡机器人创始人和首席执行官张涛接受采访时表示，公司正在为香港上市做准备。（新浪财经）</p>
+  <p><strong>机器人公司帕西尼据悉正考虑在香港上市</strong></p>
+  <p>机器人公司帕西尼据悉正考虑在香港上市。（新浪财经）</p>
+  <h2>大公司财报</h2>
+  <p><strong>知乎：2026 年 Q1 经调整净利润 1716 万元，同比增 147.2%</strong></p>
+  <p>36 氪获悉，知乎发布 2026 年第一季度业绩报告。报告显示，知乎第一季度营收 6.52 亿元，环比增长 1.3%；经调整净利润为 1716 万元，同比增长 147.2%，环比实现扭亏。其中付费内容及 IP 运营收入 4.02 亿元，环比增长 15.8%，在总营收中占比 61.7%；营销服务收入 1.91 亿元，占比达 29.4%。截至第一季度末，知乎现金及现金等价物、定期存款及短期投资合计 44.9 亿元。</p>
+  <h2>投融资</h2>
+  <p><strong>SpaceX 敲定 IPO 发行价，拟募资 750 亿美元、估值有望接近 1.77 万亿美元</strong></p>
+  <p>SpaceX 当地时间 6 月 3 日向美国证监会提交的文件显示，该公司计划以每股 135 美元的价格推介约 5.556 亿股，计划募资 750 亿美元。按这一价格并根据文件中列明的流通股数计算，SpaceX 市值将接近 1.77 万亿美元。（界面新闻）</p>
+  <p><strong>快手旗下可灵 AI 正进行融资：投前估值 180 亿美元，计划 2027 年赴港上市</strong></p>
+  <p>据报道，快手旗下视频生成业务可灵 AI 正在进行分拆以来的首轮融资，投前估值为 180 亿美元。这也是可灵 AI 的 Pre-IPO 轮融资。据了解到，可灵 AI 目前内部按照 2027 年年初能够递交港股上市申报材料推进相关工作。（IPO 早知道）</p>
+  <p><strong>“星尘智能” 完成超 10 亿 B 轮融资</strong></p>
+  <p>36 氪获悉，绳驱 AI 机器人公司 “星尘智能”（Astribot）近日完成 B 轮系列融资，三个月内三轮累计融资额超 10 亿元，投资方包括梁溪科创产业二期母基金（博华资本管理）、扬州龙投芯粒、中博聚力、中科创达、科德教育、某上市企业及国科投资等老股东持续追投。</p>
+  <p><strong>“旷行科技” 完成数千万元 Pre-A 轮融资</strong></p>
+  <p>36 氪获悉，高危作业领域具身智能公司 “旷行科技” 近期已完成数千万元市场化第一轮融资（Pre-A 轮），由财通资本和商汤国香投资。本轮资金将主要用于算法研发、产品矩阵完善及市场拓展。</p>
+  <p><strong>“千寻智能” 获 15 亿元 A+ 轮融资</strong></p>
+  <p>36 氪获悉，据千寻智能消息，“千寻智能” 获 15 亿元 A+ 轮融资，股东包含一线美元基金、大型产业投资方以及国资基金，老股东持续加码。本轮所融资金，将聚焦三大核心方向投入使用：新一代具身智能基座模型持续研发迭代、全球化真实数据基础设施体系建设、多行业场景规模化商业落地推进。</p>
+  <h2>酷产品</h2>
+  <p><strong>苹果 Vision Pro 新专利曝光，未来可模块化更换配件</strong></p>
+  <p>近日，科技媒体 Appleinsider 发布博文，报道称苹果获批一项新专利，在配合 Vision Pro 头显使用时，Apple Pencil 通过触觉反馈传递虚拟物体的摩擦、纹理和粗糙感。 （IT 之家）</p>
+  <p><strong>宇树回应与英伟达合作机器人：下半年新产品亮相</strong></p>
+  <p>日前，英伟达首席执行官黄仁勋宣布，英伟达已与宇树科技合作，推出新一代人形机器人参考设计 “H2+”。围绕前述广泛关注的话题，宇树科技工作人员表示，新的 “H2+” 机器人基于英伟达的算力平台研发，会比之前机器人的算力水平更好，新产品将于今年下半年亮相。（中新网）</p>
+  <p><strong>整理</strong>｜徐嘉彤&nbsp;</p>
+ 
+]]></content>
       <categories>
-        <category>编程</category>
+        <category>科技</category>
       </categories>
       <tags>
-        <tag>有赞技术</tag>
-        <tag>大数据</tag>
-        <tag>搜索</tag>
+        <tag>36氪</tag>
       </tags>
   </entry>
   <entry>
-    <title>知识库检索匹配的服务化实践</title>
-    <url>/2022/10/28/%E7%9F%A5%E8%AF%86%E5%BA%93%E6%A3%80%E7%B4%A2%E5%8C%B9%E9%85%8D%E7%9A%84%E6%9C%8D%E5%8A%A1%E5%8C%96%E5%AE%9E%E8%B7%B5/</url>
+    <title>刚刚，Windows「梦中神机」来了，把你的 PC 变成 Agent 工位</title>
+    <url>/2026/06/03/%E5%88%9A%E5%88%9A%EF%BC%8CWindows%E3%80%8C%E6%A2%A6%E4%B8%AD%E7%A5%9E%E6%9C%BA%E3%80%8D%E6%9D%A5%E4%BA%86%EF%BC%8C%E6%8A%8A%E4%BD%A0%E7%9A%84-PC-%E5%8F%98%E6%88%90-Agent-%E5%B7%A5%E4%BD%8D/</url>
     <content><![CDATA[<blockquote>
-<p>原文链接：<a href="https://tech.youzan.com/xiang-liang-hua-wen-ben-pi-pei-jian-suo-de-fu-wu-hua-shi-jian/">https://tech.youzan.com/xiang-liang-hua-wen-ben-pi-pei-jian-suo-de-fu-wu-hua-shi-jian/</a></p>
+<p>原文链接：<a href="https://www.ifanr.com/1667971?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=">https://www.ifanr.com/1667971?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=</a></p>
 </blockquote>
-<h1 id="">一、背景</h1>
-
-<p><img src="https://tech.youzan.com/content/images/2022/09/image-3.png" alt="知识库检索匹配的服务化实践"></p><p>　　知识库是企业经营过程中的面向客户和内部员工的知识沉淀文档库，里面包含各类教程、问答、案例等，知识库的检索匹配是自然语言处理 (NLP) 中一个重要的基础问题，本质是进行文本语义的相似度计算，也就是语义匹配，我们很多领域的任务都可以抽象为文本匹配检索任务，例如检索引擎、智能客服、知识检索、信息推荐等领域。<br><br>　　知识库检索匹配可以概述为：给定一个 query 和大量候选知识库的文档，从这些文档中找出与用户输入 query 最匹配的 TopK 个文档。</p><p></p>
-<h1 id="">二、架构流程</h1>
-
-<h2 id="21">2.1、整体架构</h2>
-
-<p><img src="https://tech.youzan.com/content/images/2022/09/----.png" alt="知识库检索匹配的服务化实践"></p>
-
-<h2 id="22">2.2、请求链路</h2>
-
-<p><img src="https://tech.youzan.com/content/images/2022/09/-----1.png" alt="知识库检索匹配的服务化实践"></p>
-
-<h1 id="">三、算法模型</h1>
-
-<h2 id="31dsl">3.1、DSL 改写</h2>
-
-<p>　　检索优化第一步：DSL 改写，接手前业务方自己已经对检索结果做过优化，调整不同字段的匹配权重，这一方法的已经难以继续优化。从知识运营的角度出发，在用户检索时，将运营认为重要的文档推到前面，由于文档之间互相有链接引用，可以使用 PageRank 算法给每个文档计算重要分 (PR 值)。<br>
-　　PageRank 的核心思想是，被引用次数越多的文档越重要。算法原理如下，假设只有四个网页 ABCD，以 AB 间的箭头为例，代表可以从 B 网页跳转到 A 网页，对 B 即一次引用（链出），对 A 则一次被引用（链入）。L (B) 表示 B 网页的链出数量，PR (B) 表示 B 网页的 PageRank 分数。
-<img src="https://tech.youzan.com/content/images/2022/10/dsl1.png" alt="知识库检索匹配的服务化实践">
-<img src="https://tech.youzan.com/content/images/2022/10/dsl2.png" alt="知识库检索匹配的服务化实践">
-　　假设所有文档的初始 PR 值是 0.25，这里 L (B)=2，L (C)=1，L (D)=3，计算出 PR (A)=0.458，接下来计算所有其他被引用（有链入）的文档 PR 值，PageRank 是个迭代算法，反复计算以后所有的 PR 值会收敛，那就是最终每个文档的 PR 值，也是用来改写 DSL 的关键信息：<br></p>
-
-<pre><code>new score = old score * log(1+2*PageRank)  
-</code></pre>
-
-<p>　　old score 指原来不同字段加不同权重由 ES 算出来的 BM25 分数，PageRank 缺失值使用 1 代替。</p>
-
-<h2 id="3">3.２、文本召回</h2>
-
-<p>　　文本召回是召回中最常用的一种策略，最常见的方式是通过对 Query 直接进行分词，然后将分词后的关键词到 ES 构建倒排索引，进行 tf-idf 等相似计算匹配索引召回，这种召回方式的优点是实现简单，不需要训练模型、低资源需求、检索速度快，然而它的缺点也很明显，文本是具有语义的、是有语法结构的，文本召回忽略了语句的语法结构，同时也无法解决一词多义和同义词的问题，对 query 进行语义层面相似的召回效果就比较一般，解决这个问题就要用到向量召回。</p>
-
-<h2 id="3">3.３、向量召回</h2>
-
-<p>　　向量召回的思想就是计算搜索词的向量和文档标题 / 相似问的向量的余弦相似度，返回相似度分数最高的 TopK 个文档，计算向量相似度的步骤放在 Milvus 进行，Milvus 作为向量检索库，对计算过程有优化，性能更好。<br>
-　　向量计算模型结构：
-<img src="https://tech.youzan.com/content/images/2022/09/------.png" alt="知识库检索匹配的服务化实践">
-　　文本转向量的算法模型由 embedding、两层 transformer 和 MLP 组成，模型最后会对编码向量做 L2 归一化，采用典型的双塔模式，可以将左塔的搜索词和右塔的文档标题形成独立的子网络，左右塔的结构分离但编码器参数共享，双塔结构天然的可以用于召回，将这个模型部署到小盒子就可以在线计算搜索词的向量，将海量的知识库文档作为右塔离线训练成文本向量后刷入向量检索工具 Milvus。<br>
-　　双塔召回模型的核心思想是将 query / item 嵌入到共享低维空间，然后通过向量距离来度量相关性。<br>
-　　向量召回流程：
-<img src="https://tech.youzan.com/content/images/2022/09/------1-1.png" alt="知识库检索匹配的服务化实践"></p>
-
-<p>　　工程实现部分的 DP 离线任务中实现了计算文档标题和相似问向量并将其导入 Milvus 的功能。由于 Milvus 对 string 类型属性信息存储检索不够友好，所以在 DB 阶段会请求 mysql 库表对召回结果进行扩展，匹配补全相关信息。<br></p>
-
-<h2 id="34">3.4、精排序</h2>
-
-<p>　　经过召回和粗排后，可以理解为将重要相关的文档排在了前面，但是距离用户真正的检索意图还有差距，可以使用用户的检索记录对结果再进行排序。<br>
-　　基于所有场景的用户检索点击数据，有点击行为就认为检索词和文档标题匹配（正样本），其他就认为没有那么匹配（负样本）<br>
-　　训练数据样例：<br>
-<img src="https://tech.youzan.com/content/images/2022/10/------.png" alt="知识库检索匹配的服务化实践">
-　　采用 in_batch 负采样就不需要提前构造负样本，模型的设计如下：
-<img src="https://tech.youzan.com/content/images/2022/10/---1.png" alt="知识库检索匹配的服务化实践">
-　　检索词与正负样本的相似度会进入 InfoNCE（info Noise Contrastive Estimation，噪声对比估计）的函数计算损失，使用这个损失来更新模型参数。这个由很多负样本组成的双塔结构也称为对比学习，核心思想是去拉近相似的样本，推开不相似的样本，目标是要从样本中学习到一个好的语义表示空间。<br>
-　　精排模型与文本转向量的算法原理相同。<br>
-　　InfoNCE 计算公式：（可以理解为带温度超参的 CrossEntropy）<br></p>
-
-<pre><code>L_i=-log(\frac{exp(sim(z_i, z_i^+)/\tau)}{\sum_j{exp(sim(z_i, z_j)/\tau)}})  
-</code></pre>
-
-<p><img src="https://tech.youzan.com/content/images/2022/10/---2.png" alt="知识库检索匹配的服务化实践">
-　　分子是正例对的相似度，分母是正例对 + 所有负例对的相似度，最小化 infoNCE loss，就是最大化正例对的相似度，最小化负例对的相似度。<br>
-　　在计算损失时，label 可以在 batch 内生成，检索词和文档的编码向量经过矩阵乘法可以得到一个相似度方阵，对角位置就是互相匹配的检索词和文档的分数，如果 batch<em>size = 4，那每行对应的 label 就是 [0,1,2,3]。in</em>batch 负采样损失计算示意图：<br>
-<img src="https://tech.youzan.com/content/images/2022/10/---3.png" alt="知识库检索匹配的服务化实践">
-<img src="https://tech.youzan.com/content/images/2022/10/---4.png" alt="知识库检索匹配的服务化实践"></p>
-
-<p>　　模型训练好以后，就得到文本的编码器，输入两个文本，就可以得到一个匹配的分数，将这个模型部署到小盒子，在需要排序时，输入候选的文档标题和检索词，按计算出来的分数从高到低排序，就完成了一次对检索结果的排序。<br></p>
-
-<h2 id="35">3.5、排序优化</h2>
-
-<p>　　上述向量召回介绍的在模型服务中计算两个文本相似度的方法，在只需要对 20 个文档（一页）排序时是没有问题的，但是每个文档还会有若干个相似问，只使用 20 个商品标题没法很好的代表整个文档，如果能使用每个文档的标题和全部相似问，那效果会更稳定一些，但这样的话，每次进入小盒子排序的文档数就不固定了，少则 20，多则几百，上百的 batch_size 走小盒子很容易超时，就算切成小的 batch，也会有一个失败全部失败的情况，而且总体上 rt 也没下降多少。<br>
-　　与向量召回时类似，模型也改为输入只有一个文本，输出这个文本的向量。每个文档的标题和全部相似问向量都与 Query 向量算相似度后计算均值，等价于先计算文档的标题和全部相似问的向量均值，再与 Query 向量计算相似度。基于此，排序任务也可以转换为向量召回任务。<br>
-　　在进入 Milvus 之前，会按照向量召回和 ES 召回的文档 ID 作为过滤条件，一次计算的 RT 就得以保证，可以支持的 QPS 也可以比基于小盒子的版本高：<br>
-<img src="https://tech.youzan.com/content/images/2022/10/----1.png" alt="知识库检索匹配的服务化实践">
-　　此方法可以解决 RT 和 QPS 问题，但是也有局限，只能优化 “每个文档的标题和全部相似问向量都与 Query 向量算相似度后计算均值” 这个均值计算逻辑，其他的比如 “取最大的相似度” 就不能这么做了，而且 Query 与文档的交互太少，只在最后算相似度，可能不如多次交互的模型的效果好。<br></p>
-
-<h1 id="">四、工程实现</h1>
-
-<p>　　当线上接受一条检索请求文本后，先调用在线推理 - 小盒子计算 Query 向量，然后去 Milvus 向量库中和知识库向量进行相似度计算，并返回距离最近的 Top N 个 Item 作为向量召回的结果。<br></p>
-
-<h2 id="41dp">4.1、离线训练（DP 平台）</h2>
-
-<p>　　海量的知识语料库向量化计算在自研 DP 平台离线运行，使得全库文本匹配速度较快：<br>
-  　　1）语料库预处理：包括语料库的文本清洗、文本筛选等预处理逻辑<br>
-  　　2）语料库向量化：利用上述的向量计算模型进行向量化<br>
-  　　3）导入 Milvus 库：将集合部署在 Milvus 集群，依次批量导入更新机器的集合保证线上可用<br></p>
-
-<h2 id="42sunfish">4.2、在线推理（Sunfish 平台）</h2>
-
-<p>　　自研算法平台（Sunfish）对模型训练提供一站式闭环服务，支持分布式训练、GPU / CPU 切换、模型版本管理、一键式运行和部署等功能，其中：<br>
-  　　1）算法工程模块：一键运行训练、任务作业管理、模型输出<br>
-  　　2）模型管理模块：实现训练任务、地址导入、本地上传等多途径模型来源选择<br>
-  　　3）模型部署模块：简单配置、模型格式选择、线上资源配置等便捷署方式<br></p>
-
-<pre><code>{
-    "inputs":[
-        {
-            "name":"INPUT",
-            "shape":[
-                1,
-                1
-            ],
-            "datatype":"BYTES",
-            "data":[
-                "满足条件满减送没有赠品"
-            ]
-        }
-    ],
-    "outputs":[
-        {
-            "name":"OUTPUT"
-        }
-    ]
-}
-</code></pre>
-
-<h2 id="43milvus">4.3、Milvus 向量检索</h2>
-
-<p>　　Milvus 是一款开源的、针对海量特征向量的向量相似性检索 (ANNS，Approximately nearest neighbor search) 引擎，集成了 Faiss、Annoy 等广泛应用的向量索引，成本更低、性能更好、高度灵活、稳定可靠以及高速查询等特点，十亿向量检索仅毫秒响应。<br>
-　　1、Milvus 向量索引列表如下：<br>
-<img src="https://tech.youzan.com/content/images/2022/10/milvus1.png" alt="知识库检索匹配的服务化实践">
-　　简言之，每种索引都有自己的适用场景，如何选择合适的索引可以简单遵循如下原则：<br>
-  　　1）当查询数据规模小，且需要 100％查询召回率时，用 FLAT；<br>
-  　　2）当需要高性能查询，且要求召回率尽可能高时，用 IVF_FLAT；<br>
-  　　3）当需要高性能查询，且磁盘、内存、显存资源有限时，用 IVFSQ8H；<br>
-  　　4）当需要高性能查询，且磁盘、内存资源有限，且只有 CPU 资源时，用 IVFSQ8。<br></p>
-
-<p>　　2、Milvus 目前支持的距离计算方式与数据格式、索引类型之间的兼容关系：
-<img src="https://tech.youzan.com/content/images/2022/10/milvus2-1.png" alt="知识库检索匹配的服务化实践">
-　　选择合适的距离计算方式比较向量间的距离，能很大程度地提高数据分类和聚类性能，主要采用内积 (IP) 的计算方式，内积更适合计算向量的方向。<br>
-　　内积计算两条向量之间的夹角余弦，并返回相应的点积。内积距离的计算公式为：<br>
-<img src="https://tech.youzan.com/content/images/2022/09/--.png" alt="知识库检索匹配的服务化实践">
-　　假设有 A 和 B 两条向量，则 ||A|| 与 ||B|| 分别代表 A 和 B 归一化后的值。cosθ 代表 A 与 B 之间的余弦夹角。<br>
-　　在向量归一化之后，内积与余弦相似度等价。因此 Milvus 并没有单独提供余弦相似度作为向量距离计算方式。<br></p>
-
-<h2 id="44ai">4.4、AI 模型接口服务</h2>
-
-<p>　　算法模型接口服务由 ai-service 和 ai-app 两个服务组成，ai-service 负责调用算法模型在线推理、Milvus 实时向量召回等接入库，ai-app 负责业务逻辑的开发。<br>
-　　1、ai-service 配置示例：<br></p>
-
-<pre><code>{
-    "model_name": "similarity_jira",
-    "model_source_type": "YZ_MODEL",
-    "model_version": 1,
-    "model_invoke_timeout": 3000,
-    "protocol": "kfserving",
-    "infer_type": "triton",
-    "feature_maps": [
-        {
-            "model_feature_key": "INPUT",
-            "data_type": "string",
-            "shape": "(-1,1)",
-            "default_value": "",
-            "feature_source": "PARAMS",
-            "source_key": "jira_text",
-            "is_required": 1
-        }
-    ],
-    "param_mapping": {
-        "jira_text": "&lt;objectList.jira_text&gt;"
-    }
-}
-</code></pre>
-
-<p>　　2、ai-app 接口设计<br>
-　　实现业务逻辑开发测试后，发布上线即可提供前后端调用。<br>
-　　a、Maven 示例:<br></p>
-
-<pre><code>&lt;dependency&gt;  
-  &lt;groupId&gt;com.youzan&lt;/groupId&gt;
-  &lt;artifactId&gt;ai-app-api&lt;/artifactId&gt;
-  &lt;version&gt;1.0.13-RELEASE&lt;/version&gt;
-&lt;/dependency&gt;  
-</code></pre>
-
-<p>　　b、请求示例：<br></p>
-
-<pre><code>invoke com.youzan.ai.app.api.service.jira.Service.retrieve({"fromApp":"test","scene":"similarity_predict","Title":"满足条件没有赠品","Key":"XXX"})  
-</code></pre>
-
-<p>　　c、返回示例：<br></p>
-
-<pre><code>{
-    "code":200,
-    "data":{
-        "Similaritys":[
-            {
-                "createdAt":1648137600000,
-                "score":0.9390,
-                "key":"XXX0123442334",
-                "title":"满足条件没有赠品"
-            },
-            {
-                "createdAt":1636214400000,
-                "score":0.9010,
-                "key":"XXX0123365819",
-                "title":"满足条件没有送赠品"
-            },
-            {
-                "createdAt":1653408000000,
-                "score":0.8735,
-                "key":"XXX0123482446",
-                "title":"订单满足条件没有送赠品"
-            },
-            {
-                "createdAt":1655308800000,
-                "score":0.8312,
-                "key":"XXX0123496337",
-                "title":"订单满足条件但是没有送赠品"
-            },
-            {
-                "createdAt":1659628800000,
-                "score":0.8028,
-                "key":"XXX0123527965",
-                "title":"订单满条件但是赠品没有送"
-            }
-        ]
-    },
-    "success":true,
-    "message":"successful"
-}
-</code></pre>
-
-<h1 id="">五、服务场景</h1>
-
-<h2 id="51">5.1、官网帮助中心</h2>
-
-<p><img src="https://tech.youzan.com/content/images/2022/09/-------1.png" alt="知识库检索匹配的服务化实践"></p>
-
-<h2 id="52">5.2、相似商品推荐</h2>
-
-<p><img src="https://tech.youzan.com/content/images/2022/09/-------2.png" alt="知识库检索匹配的服务化实践"></p>
-
-<h1 id="">六、总结</h1>
-
-<p>　　本文大致介绍了知识库检索匹配的算法和工程服务化实践过程，服务应用的业务场景比较广泛，并对类似场景的接入做了低代码封装和策略配置，便于快速轻量级的服务化落地。在知识库检索匹配服务化实践过程中，后续值得关注以下几点：<br>
-　　1）对于知识库中低频或缺失的新文档或新商品的 Embedding 学习还不够充分，可考虑利用图结算法结构，把更多 query 和其他属性的语义信息聚合，进而提升 query 和知识库文档的语义表征能力；<br>
-　　2）Embedding 的实现算法比较多，可考虑结合业务需要，将词嵌入模型模块内置化；<br>
-　　3）服务的性能和稳定性，确保服务在高准确率和高 QPS 下的响应性能依然是重中之重。</p>
-
-<h1 id="">七、招聘号外</h1>
-
-<p>　　有赞数据中台团队，目前有数据平台研发以及数据开发岗位虚位以待，有需要的同学请关注官网。</p>]]></content>
+<p><img class="alignnone size-full wp-image-1667985" src="https://s3.ifanr.com/wp-content/uploads/2026/06/32.png" alt="" width="1282" height="704" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/32.png 1282w, https://s3.ifanr.com/wp-content/uploads/2026/06/32-360x198.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/32-768x422.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/32-1024x562.png 1024w" sizes="(max-width: 1282px) 100vw, 1282px"></p>
+<p>微软和 OpenAI 的蜜月期，曾经是整个 AI 行业最重要的联盟。</p>
+<p>一方握着模型，另一方手握云服务、办公软件、开发者工具和企业客户，双方互相成就，几乎让微软在 AI 时代提前拿到一张头等舱门票。但即便联盟再紧密，微软也不能永远把最关键的 AI 想象力寄托在别人身上。</p>
+<p>尤其是在双方关系开始脱钩之后。</p>
+<p><img class="alignnone size-full wp-image-1667972" src="https://s3.ifanr.com/wp-content/uploads/2026/06/11-1.png" alt="" width="1278" height="706" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/11-1.png 1278w, https://s3.ifanr.com/wp-content/uploads/2026/06/11-1-360x199.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/11-1-768x424.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/11-1-1024x566.png 1024w" sizes="(max-width: 1278px) 100vw, 1278px"></p>
+<p>刚刚召开的 Build 2026 因此变成一场特殊的发布会。微软比以往任何时候都需要一场酣畅淋漓的 AI 胜利，向外界证明自己究竟是 AI 时代的主角，还是依旧只是 OpenAI 的云服务商？</p>
+<p>从 MAI 模型、Azure AI Foundry、到量子计算以及本地智能体能力，再加上黄仁勋和龙虾之父的相继站台，微软展示了一整套覆盖开发、模型、数据、算力和治理的完整生态，其目标也很清晰：将 AI 从 OpenAI 主导的模型红利，转变为微软主导的平台生意。</p>
+<h3>微软自研模型发布， MAI 补上 AI 供应链最关键一环</h3>
+<p>相比去年，微软这次把模型放在了更重要的位置。微软 CEO 纳德拉称，Microsoft Foundry 目前已有超过 11000 个模型，覆盖 OpenAI、Anthropic 和微软自研 MAI 模型。</p>
+<p>微软的判断是，企业和开发者不会只依赖一个模型完成所有任务。不同任务会对应不同模型，也会受到延迟、成本和能力边界的约束。因此，模型目录、模型选择、运行环境和企业治理，会一起构成新的平台竞争点。</p>
+<p>今天，微软自研模型家族正式一口气推出了七款新模型，覆盖推理、代码、图像、语音和转录等方向。</p>
+<p><img class="alignnone size-full wp-image-1667973" src="https://s3.ifanr.com/wp-content/uploads/2026/06/12-1.png" alt="" width="1280" height="714" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/12-1.png 1280w, https://s3.ifanr.com/wp-content/uploads/2026/06/12-1-360x201.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/12-1-768x428.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/12-1-1024x571.png 1024w" sizes="(max-width: 1280px) 100vw, 1280px"></p>
+<p>MAI Thinking 1 是其中的推理模型。它采用稀疏 MoE 架构，35B active 参数，总参数规模约 1T，支持 256K token 上下文，足以容纳大约 600 页文档。</p>
+<p>微软 AI 负责人穆斯塔法・苏莱曼强调，这个模型没有使用第三方模型蒸馏，训练数据来自干净且合规授权的数据，并在预训练中排除了 AI 生成内容。它已在 Microsoft Foundry 私有预览，之后会进入 MAI Playground 公测。</p>
+<p><img class="alignnone size-full wp-image-1667974" src="https://s3.ifanr.com/wp-content/uploads/2026/06/13-3.png" alt="" width="1284" height="710" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/13-3.png 1284w, https://s3.ifanr.com/wp-content/uploads/2026/06/13-3-360x199.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/13-3-768x425.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/13-3-1024x566.png 1024w" sizes="(max-width: 1284px) 100vw, 1284px"></p>
+<p>代码模型 MAI Code 1 Flash 面向日常开发工作流。它由微软端到端训练，使用干净且合规授权的数据，正在向 Visual Studio Code 中的 GitHub Copilot 个人用户推出，入口包括模型选择器和默认自动选择器。</p>
+<p>微软称，这个模型针对 GitHub Copilot harness 做了训练和适配，支持 Agentic coding，也支持 adaptive thinking。简单请求保持简洁，复杂任务会投入更多推理预算。</p>
+<p>微软把 MAI Code 1 Flash 直接拿来和 Claude Haiku 4.5 比较。</p>
+<p>MAI Code 1 Flash 在 SWE Bench Pro 上达到 51.2%，高于 Claude Haiku 4.5 的 35.2%；在 IF Bench 精确指令跟随上领先 28.9 分，在 Advanced IF 上领先 14.5 分。它将支撑微软 GitHub Copilot 的常见编码场景，尤其是代码修改、多轮指令和真实开发环境里的 Agent 任务。<br>
+图像和语音模型也被纳入 MAI 体系。</p>
+<p>MAI Image 2.5 和 Flash 版本支持文本生成图像和图像编辑，已经进入 PowerPoint，并会扩展到 OneDrive 和 Foundry。</p>
+<p><img class="alignnone size-full wp-image-1667975" src="https://s3.ifanr.com/wp-content/uploads/2026/06/14-3.png" alt="" width="1280" height="716" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/14-3.png 1280w, https://s3.ifanr.com/wp-content/uploads/2026/06/14-3-360x201.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/14-3-768x430.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/14-3-1024x573.png 1024w" sizes="(max-width: 1280px) 100vw, 1280px"></p>
+<p>MAI Transcribe 1.5 支持 43 种语言，微软称其速度达到竞品 5 倍，正在集成到 GitHub、Teams、Copilot 和 Dynamics 365 Contact Center。</p>
+<p>MAI Voice 2 支持 15 种语言，可通过短样本适配声音，同时内置防滥用保护；低成本版本 MAI Voice 2 Flash 也在计划中。</p>
+<p>微软还把 MAI 模型和自己的芯片联系起来。MAI Thinking 1 已针对 Maia 200 优化，端到端运行 MAI 模型时，还能获得 1.4 倍每瓦性能提升。</p>
+<p><img class="alignnone size-full wp-image-1667976" src="https://s3.ifanr.com/wp-content/uploads/2026/06/15-4.png" alt="" width="1278" height="706" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/15-4.png 1278w, https://s3.ifanr.com/wp-content/uploads/2026/06/15-4-360x199.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/15-4-768x424.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/15-4-1024x566.png 1024w" sizes="(max-width: 1278px) 100vw, 1278px"></p>
+<p>企业定制也是 MAI 模型的重要方向。未来所有企业不仅会调用模型，也会把自己的流程训练进模型。</p>
+<p>为此，微软还发布了 Microsoft Frontier Tuning，核心是 reinforcement learning environments。企业可以把真实工作轨迹、任务步骤、决策、工具调用和评价标准变成训练环境，让模型学习组织内部的工作方式。</p>
+<h3>PC 变成 Agent 工位，你的桌面就是数据中心</h3>
+<p>除了模型，微软也把重点转向本地算力。</p>
+<p><img class="alignnone size-full wp-image-1667977" src="https://s3.ifanr.com/wp-content/uploads/2026/06/21-1.png" alt="" width="1270" height="662" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/21-1.png 1270w, https://s3.ifanr.com/wp-content/uploads/2026/06/21-1-360x188.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/21-1-768x400.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/21-1-1024x534.png 1024w" sizes="(max-width: 1270px) 100vw, 1270px"></p>
+<p>Surface RTX Spark Dev Box 是这部分最值得一提的产品。纳德拉把它称为面向开发者的「dream machine（梦中神机）」。这台设备提供 1 petaflop AI 算力、20 个 CPU 核心和 128GB 统一内存，计划在今年秋季推出。</p>
+<p><img class="alignnone size-full wp-image-1667978" src="https://s3.ifanr.com/wp-content/uploads/2026/06/22-1.png" alt="" width="1298" height="756" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/22-1.png 1298w, https://s3.ifanr.com/wp-content/uploads/2026/06/22-1-360x210.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/22-1-768x447.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/22-1-1024x596.png 1024w" sizes="(max-width: 1298px) 100vw, 1298px"></p>
+<p>Surface RTX Spark Dev Box 基于 Nvidia RTX Spark 平台。正如 APPSO 前几天所报道的，RTX Spark 是面向 PC 的下一代 SoC，把 CPU、GPU 和 AI 能力整合到一颗芯片中，并支持统一内存架构和集成 DRTM。</p>
+<p>英伟达 CEO 黄仁勋在视频连线中表示，PC 正在从个人电脑走向个人 AI。他举例称：用户外出时，可以给自己的 PC 发消息，让本地 Agent 调用工具、修改代码、推进设计，再和用户继续迭代。</p>
+<p>PC 不再只是一个被人操作的工具，也开始变成可以持续运行任务的 AI 助手。</p>
+<p>此外，微软还为 Surface RTX Spark Dev Box 预装开发优化的 Windows 11 Pro，内置 VS Code、WSL、PowerShell 7、GitHub Copilot、Coreutils for Windows 等工具。</p>
+<p>现场演示中，这台设备默认没有新闻流、组件弹窗和通知，使用深色模式；Windows Insider 版本还加入了纵向任务栏，不仅开发工具被进一步系统化，命令行和容器体验也更接近 Linux。</p>
+<p><img class="alignnone size-full wp-image-1667979" src="https://s3.ifanr.com/wp-content/uploads/2026/06/23-1.png" alt="" width="1266" height="696" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/23-1.png 1266w, https://s3.ifanr.com/wp-content/uploads/2026/06/23-1-360x198.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/23-1-768x422.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/23-1-1024x563.png 1024w" sizes="(max-width: 1266px) 100vw, 1266px"></p>
+<p>硬件上，它采用阳极氧化铝 3D 打印一体机身，拥有 1000 个通风孔，热设计功耗 100W，接口包括 USB - C、USB - A、HDMI、以太网和耳机接口。</p>
+<p>Windows 将在 AI 时代大有作为。本地 AI 要让 PC 成为 Agent 工作流的一部分：开发者可以在本地调试、运行模型、调用工具、看日志、开容器、跑子 Agent，再把更大规模任务交给云端。</p>
+<h3>Agent 需要新入口，微软探路下一代 AI 终端</h3>
+<p>相比 Surface RTX Spark Dev Box 面向开发者，Project Solara 更像微软对 Agent 设备形态的提前试探。下一台计算机不会只是一台设备，而是一组协同工作的设备。</p>
+<p>微软展示了两类参考设备。</p>
+<p>第一类是固定在桌面上的工作终端，基于联发科芯片。</p>
+<p><img class="alignnone size-full wp-image-1667980" src="https://s3.ifanr.com/wp-content/uploads/2026/06/24-1.png" alt="" width="1280" height="718" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/24-1.png 1280w, https://s3.ifanr.com/wp-content/uploads/2026/06/24-1-360x202.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/24-1-768x431.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/24-1-1024x574.png 1024w" sizes="(max-width: 1280px) 100vw, 1280px"></p>
+<p>用户走近后，系统会安全识别身份，并让用户进入自己的 Agent 工作环境，访问基于 Work IQ 的 Microsoft 365 Copilot。</p>
+<p>它可以显示当天重要事项，也支持点按或语音交给 Agent 处理任务，还能作为 Windows PC 伴侣，或通过 Windows 365 接入 Cloud PC。它更像企业办公桌上的 Agent 控制终端，负责身份识别、任务提醒、语音交互、Copilot 调用和 Cloud PC 接入。</p>
+<p>第二类是可佩戴数字工牌，使用 Qualcomm 可穿戴芯片，面向移动工作场景。</p>
+<p><img class="alignnone size-full wp-image-1667981" src="https://s3.ifanr.com/wp-content/uploads/2026/06/25-1.png" alt="" width="1282" height="706" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/25-1.png 1282w, https://s3.ifanr.com/wp-content/uploads/2026/06/25-1-360x198.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/25-1-768x423.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/25-1-1024x564.png 1024w" sizes="(max-width: 1282px) 100vw, 1282px"></p>
+<p>演示中，用户通过指纹解锁后，要求 Copilot 为社交媒体帖子收集现场素材。工牌负责拍摄画面，Agent 负责挑选镜头、清理画面，并发送给本人和团队审阅。发布会还展示了医疗场景：护士可用它进行免提语音记录、区分说话人、核验生命体征、扫描药物并验证护理流程。</p>
+<p>这两类设备只是参考形态。</p>
+<p>手机和 PC 仍然重要，但一些工作场景需要更靠近人、空间和传感器的硬件。面对未来的 Agent 时代，企业可以更换 Agent，调整外观、屏幕、传感器和输入方式，在同一硬件和软件基础上适配不同垂直行业。</p>
+<h3>龙虾之父站台，微软给个人 Agent 加上企业护栏</h3>
+<p>Surface RTX Spark Dev Box 讲的是本地算力，Project Solara 讲的是新设备形态，OpenClaw on Windows 则把焦点转到个人 Agent 如何安全进入企业。</p>
+<p>微软展示了适用于 OpenClaw 的 Windows 套件，可以帮助用户设置自己的 OpenClaw，或连接已经托管在 Windows 和 WSL 中的 OpenClaw。</p>
+<p><img class="alignnone size-full wp-image-1667983" src="https://s3.ifanr.com/wp-content/uploads/2026/06/27-1.png" alt="" width="1274" height="710" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/27-1.png 1274w, https://s3.ifanr.com/wp-content/uploads/2026/06/27-1-360x201.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/27-1-768x428.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/27-1-1024x571.png 1024w" sizes="(max-width: 1274px) 100vw, 1274px"></p>
+<p>应用里可以查看 gateway、参与 OpenClaw 的其他机器、会话和使用情况，也能快速进入 chat、canvas 和主控制台。</p>
+<p>安全演示围绕文件权限展开。</p>
+<p>OpenClaw Windows Companion app 允许用户控制 Agent 能访问哪些文件夹，以及这些文件夹是只读、可写还是隐藏。它也可以配置剪贴板访问、联网权限等细粒度选项。</p>
+<p>微软在现场要求 OpenClaw 删除桌面上的所有文件，并临时关闭 OpenClaw 自身的安全层，只保留 MXC 的系统级限制。由于桌面文件夹被设置为只读，OpenClaw 多次尝试删除和检查目录，最后仍无法删除文件，桌面上的 94 张 JPG 得以保留。</p>
+<p><img class="alignnone size-full wp-image-1667985" src="https://s3.ifanr.com/wp-content/uploads/2026/06/32.png" alt="" width="1282" height="704" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/32.png 1282w, https://s3.ifanr.com/wp-content/uploads/2026/06/32-360x198.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/32-768x422.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/32-1024x562.png 1024w" sizes="(max-width: 1282px) 100vw, 1282px"></p>
+<p>龙虾之父 Peter Steinberger 也透露，过去几个月 OpenClaw 与 Microsoft、GitHub、OpenAI、Nvidia 等团队合作，增加了可观测性、自动权限模式，并重新设计访问控制。现在权限不再只有全部允许或全部禁止，用户可以指定哪些文件夹只读、哪些可写、哪些对 Agent 隐藏。</p>
+<p>他还宣布，OpenClaw 可以在公司内部运行，harness 本身已经插件化。企业可以接入自己信任的 Copilot、Codex 或其他系统，把已有规则带进 OpenClaw，再获得持续记忆、heartbeat，以及在 Slack 或 Teams 中使用 OpenClaw 的能力。</p>
+<h3>AI 下半场，微软盯上企业平台入口</h3>
+<p>除前述硬件和 Windows 更新外，微软还发布了更多产品。</p>
+<p>开发工具方面，微软发布新的 GitHub Copilot app。它更像一个 Agent 编码会话管理器，开发者可以同时启动多个 issue 会话，并用 Git worktree 隔离，让多个 Agent 并行工作。</p>
+<p><img class="alignnone size-full wp-image-1667986" src="https://s3.ifanr.com/wp-content/uploads/2026/06/33.png" alt="" width="1276" height="714" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/33.png 1276w, https://s3.ifanr.com/wp-content/uploads/2026/06/33-360x201.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/33-768x430.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/33-1024x573.png 1024w" sizes="(max-width: 1276px) 100vw, 1276px"></p>
+<p>Agent Merge 则负责跟踪 PR 的 CI 检查、代码审查和合并冲突。微软还发布 Raven，这是一个 Agent first SDK，用于连接 backend as a service，处理身份、存储和数据库 schema 等后端问题。</p>
+<p>上下文能力由 Web IQ 承担。</p>
+<p>Agent 要进入企业流程，需要连接网络新信息、企业业务对象、实时运营状态、人员关系和组织流程。Web IQ 负责外部网络信息，支持网页、新闻、图片和视频，模型无关、MCP native，可接入任意 Agent runtime，让 Agent 的回答建立在更新、可验证的内容上。</p>
+<p><img class="alignnone size-full wp-image-1667987" src="https://s3.ifanr.com/wp-content/uploads/2026/06/34.png" alt="" width="1286" height="712" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/34.png 1286w, https://s3.ifanr.com/wp-content/uploads/2026/06/34-360x199.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/34-768x425.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/34-1024x567.png 1024w" sizes="(max-width: 1286px) 100vw, 1286px"></p>
+<p>Copilot 也在升级为更复杂的工作入口。</p>
+<p>纳德拉称，今年夏天会把 chat、cowork 和 code 放入同一个 Copilot，并发布 Autopilots。首个 Autopilot 名为 Scout，面向 Copilot Frontier 用户开放，可在 Teams 群聊和 Outlook 线程中工作。</p>
+<p>企业治理层面，微软发布 Agent 365。它为 Agent 提供身份、权限、访问控制和合规管理，并接入 Entra、Defender 和 Purview。Agent 365 可管理托管在 Azure、AWS、GCP 或其他环境中的 Agent，也支持不同框架构建的 Agent。</p>
+<p>科研方向则是 Microsoft Discovery。纳德拉把它定义为面向科学发现的 Agent 平台，希望把论文研究、候选方案生成、仿真计算、实验设计和自动化实验室连接成连续流程。</p>
+<p>发布会最后，微软还正式发布了新一代量子芯片 Majorana 2，其量子比特平均寿命可达 20 秒，最高接近 1 分钟，比 Majorana 1 高约 1000 倍；操作时间为 1 微秒，尺寸仍为 0.01 毫米量级，并采用全数字控制。</p>
+<p><img class="alignnone size-full wp-image-1667989" src="https://s3.ifanr.com/wp-content/uploads/2026/06/36.png" alt="" width="1278" height="714" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/36.png 1278w, https://s3.ifanr.com/wp-content/uploads/2026/06/36-360x201.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/36-768x429.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/36-1024x572.png 1024w" sizes="(max-width: 1278px) 100vw, 1278px"></p>
+<p>至此，这场拼图庞大且野心勃勃的发布会终于完整。AI 的第一阶段，主导行业叙事的是模型公司；第二阶段，主导产业落地的可能是平台公司。</p>
+<p>谁来选择模型，谁来分配任务，谁来管理 Agent，谁来定义权限和审计，谁就更接近企业 AI 的核心入口。当模型逐渐成为标准能力之后，真正决定价值归属的，将是承载这些模型运行的系统。</p>
+<p>如果说当年那张 AI 时代的头等舱门票，很大程度上是借助盟友 OpenAI 的力量抢下的；那么现在，微软已经坐进了驾驶舱，并打算亲自接管这架飞机的航向。</p>
+<p>#欢迎关注爱范儿官方微信公众号：爱范儿（微信号：ifanr），更多精彩内容第一时间为您奉上。</p>]]></content>
       <categories>
-        <category>编程</category>
+        <category>数码</category>
       </categories>
       <tags>
-        <tag>有赞技术</tag>
-        <tag>大数据</tag>
-        <tag>向量化</tag>
+        <tag>爱范儿</tag>
+        <tag>产品</tag>
+        <tag>AI</tag>
+        <tag>微软</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>制糖工厂发布 AI 小电拼 Mirror：FluxAI 自由流让多口充电进入「功率复用」时代</title>
+    <url>/2026/06/04/%E5%88%B6%E7%B3%96%E5%B7%A5%E5%8E%82%E5%8F%91%E5%B8%83-AI-%E5%B0%8F%E7%94%B5%E6%8B%BC-Mirror%EF%BC%9AFluxAI-%E8%87%AA%E7%94%B1%E6%B5%81%E8%AE%A9%E5%A4%9A%E5%8F%A3%E5%85%85%E7%94%B5%E8%BF%9B%E5%85%A5%E3%80%8C%E5%8A%9F%E7%8E%87%E5%A4%8D%E7%94%A8%E3%80%8D%E6%97%B6%E4%BB%A3/</url>
+    <content><![CDATA[<blockquote>
+<p>原文链接：<a href="https://www.ifanr.com/1667933?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=">https://www.ifanr.com/1667933?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=</a></p>
+</blockquote>
+<p><img class="aligncenter size-full wp-image-1667934" src="https://s3.ifanr.com/wp-content/uploads/2026/06/01.png" alt="" width="1946" height="2588" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/01.png 1946w, https://s3.ifanr.com/wp-content/uploads/2026/06/01-360x479.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/01-768x1021.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/01-770x1024.png 770w" sizes="(max-width: 1946px) 100vw, 1946px"></p>
+<p>制糖工厂 CANDYSIGN 发布 AI 小电拼 Mirror。作为 AI 小电拼系列的新一代旗舰产品，Mirror 延续 4C 五口设计，4 个 USB - C 口均支持最高 140W 输出，并通过 FluxAI 自由流 ® 算法，在多设备场景下实现功率实时回收、动态再分配。</p>
+<p><img class="aligncenter size-full wp-image-1667935" src="https://s3.ifanr.com/wp-content/uploads/2026/06/02.png" alt="" width="4375" height="10731" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/02.png 4375w, https://s3.ifanr.com/wp-content/uploads/2026/06/02-360x883.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/02-768x1884.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/02-417x1024.png 417w" sizes="(max-width: 4375px) 100vw, 4375px"></p>
+<p>AI 小电拼 Mirror 的核心体验可以概括为「160F＞250」：160W 满载功率，加上 FluxAI 自由流 ® 的全时动态调度能力，在真实桌面使用中，比单纯堆高额定功率更有效。</p>
+<p><img class="aligncenter size-full wp-image-1667936" src="https://s3.ifanr.com/wp-content/uploads/2026/06/03.png" alt="" width="1687" height="2530" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/03.png 1687w, https://s3.ifanr.com/wp-content/uploads/2026/06/03-360x540.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/03-768x1152.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/03-683x1024.png 683w" sizes="(max-width: 1687px) 100vw, 1687px"></p>
+<p>这里的「＞」不是物理总功率的算术比较，而是功率利用率的比较。多口充电进入真实使用场景后，决定体验的因素不只取决于参数大小，还包括端口调度、功率回收、设备负载变化，以及系统对闲置功率的复用能力。</p>
+<h3><strong>传统大功率充电器的痛点：功率经常被「空占」</strong></h3>
+<p>在传统多口充电器里，功率分配往往基于固定表格完成。一个接口被分配到 100W，并不意味着连接设备会一直消耗 100W。</p>
+<p><img class="aligncenter size-full wp-image-1667937" src="https://s3.ifanr.com/wp-content/uploads/2026/06/04.png" alt="" width="1600" height="2400" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/04.png 1600w, https://s3.ifanr.com/wp-content/uploads/2026/06/04-360x540.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/04-768x1152.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/04-683x1024.png 683w" sizes="(max-width: 1600px) 100vw, 1600px"></p>
+<p>以 MacBook 为例，它可能插在一个 100W 接口上，但在轻办公状态下真实功耗只有 20W。剩下的 80W，在传统固定分配逻辑中无法灵活释放，仍然被锁在这个接口上。与此同时，其他设备如果进入快充阶段，可能反而拿不到足够功率。</p>
+<p><img class="aligncenter size-full wp-image-1667938" src="https://s3.ifanr.com/wp-content/uploads/2026/06/05.jpg" alt="" width="3000" height="4000" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/05.jpg 3000w, https://s3.ifanr.com/wp-content/uploads/2026/06/05-360x480.jpg 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/05-768x1024.jpg 768w" sizes="(max-width: 3000px) 100vw, 3000px"></p>
+<p>这也是许多高额定功率充电器在多设备场景中体验不够顺滑的原因：总功率看起来很高，但端口功率被写死。用户每插入一个设备，系统可能重新分配一次；再插入一个设备，又需要全体断电重新握手。功率没有真正流动起来。</p>
+<h3><strong>FluxAI 自由流：把整台充电器变成共享功率池</strong></h3>
+<p>AI 小电拼 Mirror 搭载的 FluxAI 自由流 ® 算法，改变的是这套固定切分逻辑。</p>
+<p>自由流把整台充电器视为一个共享功率池。谁需要，功率就流向谁；设备功耗下降，闲置功率会被系统回收；手机开始快充，系统再动态补给。整个过程实时发生，并保持全时不断连。</p>
+<p>FluxAI 自由流的关键机制可以概括为：实时监测、瞬时回收、动态再分配。它不再让某个端口长期占有固定功率，而是让所有功率像水流一样在设备之间变频流动。</p>
+<p><img class="aligncenter size-full wp-image-1667939" src="https://s3.ifanr.com/wp-content/uploads/2026/06/06.png" alt="" width="1600" height="2400" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/06.png 1600w, https://s3.ifanr.com/wp-content/uploads/2026/06/06-360x540.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/06-768x1152.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/06-683x1024.png 683w" sizes="(max-width: 1600px) 100vw, 1600px"></p>
+<p>这意味着，即使 AI 小电拼 Mirror 接入了 Lightning 小设备这类低功耗产品，它也不会长期占死一个高功率通道。闲置功率会回到系统池中，再分配给真正需要的设备。</p>
+<h3><strong>160F＞250：从纸面功率到有效功率</strong></h3>
+<p>「160F＞250」强调的不是 160W 在物理意义上大于 250W，而是在多数真实桌面场景里，一个高利用率、动态调度、不会空占功率的系统，往往比单纯堆更高账面参数更重要。</p>
+<p><img class="aligncenter size-full wp-image-1667940" src="https://s3.ifanr.com/wp-content/uploads/2026/06/07.jpg" alt="" width="3000" height="4000" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/07.jpg 3000w, https://s3.ifanr.com/wp-content/uploads/2026/06/07-360x480.jpg 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/07-768x1024.jpg 768w" sizes="(max-width: 3000px) 100vw, 3000px"></p>
+<p>真实桌面状态通常是动态的：笔记本可能处于轻办公，手机在断续快充，iPad 在播放视频，耳机只需要小电流补电。很少有用户会长时间遇到四台设备全天候、同时满载的极端状态。</p>
+<p><img class="aligncenter size-full wp-image-1667941" src="https://s3.ifanr.com/wp-content/uploads/2026/06/08.jpg" alt="" width="3000" height="4000" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/08.jpg 3000w, https://s3.ifanr.com/wp-content/uploads/2026/06/08-360x480.jpg 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/08-768x1024.jpg 768w" sizes="(max-width: 3000px) 100vw, 3000px"></p>
+<p>自由流的价值就在于让功率跟随需求变化。它不把端口当作固定车位，而是把功率当作可以实时调度的资源。用户不必反复思考哪个口该插哪里，也不必为了避免掉功率而记住复杂的接口顺序。</p>
+<p>这也是 AI 小电拼 Mirror 与传统多口充电器的核心差异：它关注的不只是额定功率，而是有效功率。</p>
+<h3><strong>高能巡航：让持续输出成为生产力基础</strong></h3>
+<p>AI 小电拼 Mirror 支持 4×140W 盲插，单一 USB - C 接口最高 140W 输出，双笔电模式可实现 2×80W，搭配 Oxie 牛架可解锁 160W 满血巡航。</p>
+<p><img class="aligncenter size-full wp-image-1667942" src="https://s3.ifanr.com/wp-content/uploads/2026/06/09.png" alt="" width="800" height="1200" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/09.png 800w, https://s3.ifanr.com/wp-content/uploads/2026/06/09-360x540.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/09-768x1152.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/09-683x1024.png 683w" sizes="(max-width: 800px) 100vw, 800px"></p>
+<p>Mirror 面向黑客松、长时间 4K / 8K 渲染、AI 推理等持续高负载场景，提供长时间稳定供电能力。这种能力被称为「高能巡航」：它追求的不是短时间峰值，而是在真实使用环境中尽可能长时间维持满血供电，减少温度、分配策略或多口竞争带来的性能波动。</p>
+<p><img class="aligncenter size-full wp-image-1667943" src="https://s3.ifanr.com/wp-content/uploads/2026/06/10.jpg" alt="" width="3000" height="2250" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/10.jpg 3000w, https://s3.ifanr.com/wp-content/uploads/2026/06/10-360x270.jpg 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/10-768x576.jpg 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/10-1024x768.jpg 1024w" sizes="(max-width: 3000px) 100vw, 3000px"></p>
+<p>在这种场景里，自由流的意义会被放大。长时间工作流中，设备负载会不断变化：笔记本渲染时功耗升高，任务结束后功耗回落；手机进入快充区间后快速请求功率，随后又逐步下降。FluxAI 自由流会在这些变化中持续回收与补给，让整套桌面设备获得更平滑的供电体验。</p>
+<h3><strong>从「功率分配」到「资源调度」</strong></h3>
+<p>自由流更接近一种资源实时调度系统。</p>
+<p>它的逻辑与现代系统中的动态带宽、变频空调、多设备资源池类似：资源不再被静态切割，而是根据需求实时流动。类似现代 2.0T 动力系统依靠涡轮、电控与能量调度，在真实道路中获得更高效率；自由流则通过功率池与实时回收复用，在真实桌面场景中提高每一瓦电的利用率。</p>
+<p><img class="aligncenter size-full wp-image-1667944" src="https://s3.ifanr.com/wp-content/uploads/2026/06/11.jpg" alt="" width="3000" height="4000" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/11.jpg 3000w, https://s3.ifanr.com/wp-content/uploads/2026/06/11-360x480.jpg 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/11-768x1024.jpg 768w" sizes="(max-width: 3000px) 100vw, 3000px"></p>
+<p>对于用户而言，这种转变带来的结果很直接：不用背功率表，不用按端口排序，不用在多个设备之间反复权衡。插上设备后，系统负责让功率流向更需要的地方。</p>
+<h3><strong>CanOS 2.0：自由流从算法进化为实时调度器</strong></h3>
+<p>AI 小电拼 Mirror 基于 SDC（Software-Defined Charger，软件定义充电器）架构，搭载 CanOS 2.0 如意系统。</p>
+<p><img class="aligncenter size-full wp-image-1667945" src="https://s3.ifanr.com/wp-content/uploads/2026/06/12.jpg" alt="" width="4767" height="7149" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/12.jpg 4767w, https://s3.ifanr.com/wp-content/uploads/2026/06/12-360x540.jpg 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/12-768x1152.jpg 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/12-683x1024.jpg 683w" sizes="(max-width: 4767px) 100vw, 4767px"></p>
+<p>CanOS 2.0 将自由流调度从算法升级为实时调度器，支持高能巡航、多设备状态切换与长时间高负载下的稳定供电。它还带来显示系统重构、协议固件可持续更新、端云配置同步、控制与协议通讯重构，以及对 MCP 与 OpenClaw 等 AI 智能体的支持。</p>
+<p><img class="aligncenter size-full wp-image-1667946" src="https://s3.ifanr.com/wp-content/uploads/2026/06/13-2.png" alt="" width="1600" height="2400" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/13-2.png 1600w, https://s3.ifanr.com/wp-content/uploads/2026/06/13-2-360x540.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/13-2-768x1152.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/13-2-683x1024.png 683w" sizes="(max-width: 1600px) 100vw, 1600px"></p>
+<p>这意味着 Mirror 的充电能力不完全由出厂时的固定规则决定。通过 SDC 架构、CanOS 2.0、FluxAI 自由流与全模 OTA，AI 小电拼 Mirror 更像一套可以持续更新的个人供电系统。</p>
+<h3><strong>一台更会调度的桌面能源设备</strong></h3>
+<p>AI 小电拼 Mirror 仍然是一台充电器：它支持小米 120W 澎湃秒充私有协议，兼容 PPS、PD3.1、UFCS、AVS 等协议；它拥有 0.5 英寸 ingBar 琥珀屏，配备 Wingie 蝶架与 Oxie 牛架，并延续可拼拆的家旅双栖设计。</p>
+<p><img class="aligncenter size-full wp-image-1667947" src="https://s3.ifanr.com/wp-content/uploads/2026/06/14-2.png" alt="" width="1600" height="2400" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/14-2.png 1600w, https://s3.ifanr.com/wp-content/uploads/2026/06/14-2-360x540.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/14-2-768x1152.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/14-2-683x1024.png 683w" sizes="(max-width: 1600px) 100vw, 1600px"></p>
+<div class="editor-image-source">
+<p style="text-align: center;">▲ Wingie 蝶架</p>
+</div>
+<p><img class="aligncenter size-full wp-image-1667948" src="https://s3.ifanr.com/wp-content/uploads/2026/06/15-3.png" alt="" width="1600" height="2400" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/15-3.png 1600w, https://s3.ifanr.com/wp-content/uploads/2026/06/15-3-360x540.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/15-3-768x1152.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/15-3-683x1024.png 683w" sizes="(max-width: 1600px) 100vw, 1600px"></p>
+<div class="editor-image-source">
+<p style="text-align: center;">▲ Oxie 牛架</p>
+</div>
+<p>但自由流让它的产品定义向前走了一步。Mirror 不再只是在比谁的瓦数更大，而是在解决多设备时代更常见的问题：当桌面上同时存在笔记本、手机、平板、耳机、掌机和充电宝时，系统如何让每一瓦电都去到更需要的地方。</p>
+<p><img class="aligncenter size-full wp-image-1667949" src="https://s3.ifanr.com/wp-content/uploads/2026/06/16-3.png" alt="" width="1600" height="2400" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/16-3.png 1600w, https://s3.ifanr.com/wp-content/uploads/2026/06/16-3-360x540.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/16-3-768x1152.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/16-3-683x1024.png 683w" sizes="(max-width: 1600px) 100vw, 1600px"></p>
+<p>在这个意义上，AI 小电拼 Mirror 的重点不是把充电器做成更大的功率容器，而是把充电器做成一个更会调度的能源系统。</p>
+<h3><strong>关于制糖工厂 CANDYSIGN</strong></h3>
+<p>制糖工厂 CANDYSIGN 是一个以极致美感和灵活多用电能产品为核心的品牌。秉承「好产品就是一颗糖」的理念，制糖工厂融合科技、艺术与时尚，服务创作者、开发者和多设备生产力用户，持续探索数字电能产品的新形态。</p>
+<p>了解更多：https://thecandysign.com/</p>
+<p>#欢迎关注爱范儿官方微信公众号：爱范儿（微信号：ifanr），更多精彩内容第一时间为您奉上。</p>]]></content>
+      <categories>
+        <category>数码</category>
+      </categories>
+      <tags>
+        <tag>爱范儿</tag>
+        <tag>制糖工厂</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>李宁需要库里，但库里更需要李宁</title>
+    <url>/2026/06/04/%E6%9D%8E%E5%AE%81%E9%9C%80%E8%A6%81%E5%BA%93%E9%87%8C%EF%BC%8C%E4%BD%86%E5%BA%93%E9%87%8C%E6%9B%B4%E9%9C%80%E8%A6%81%E6%9D%8E%E5%AE%81/</url>
+    <content><![CDATA[<blockquote>
+<p>原文链接：<a href="https://36kr.com/p/3838185031305474?f=rss">https://36kr.com/p/3838185031305474?f=rss</a></p>
+</blockquote>
+  <p><strong>作者 |&nbsp;</strong>谢芸子</p>
+  <p><strong>编辑 |&nbsp;</strong>张帆&nbsp;</p>
+  <p>一条消息让体育圈炸了锅。</p>
+  <p>6 月 2 日，NBA 球星斯蒂芬・库里与中国运动品牌李宁，签下了一为期十年的代言。双方均未披露具体金额，但业内口径相当统一：这是一份总价超过 4 亿美元（约合 27 亿元人民币）的超级合同。</p>
+  <p>据多方信息，库里每年保底可获 3000 万美元的代言费，还能从其个人品牌 Curry Brand 的销售中得到提成，外加李宁的流通股股权激励。这套 “高保底 + 销售分成 + 股权” 的组合模式，完全对标耐克当年给迈克尔・乔丹的待遇。</p>
+  <p>库里的江湖地位毋庸置疑：他是 “NBA 历史上最具革命性影响的球员之一”，控卫历史第二，是 “小球时代” 的奠基人。</p>
+  <p>今年 4 月，《今日美国》评选 “NBA 历史 25 大巨星”，库里排名第四，紧随乔丹、詹姆斯、科比之后。在更多专业体育媒体的排名中，库里多在第十到第十三位。从实力、流量到市场好感度，库里拥有体育品牌渴望的一切。<strong>股价的反应却和这一感知相悖。</strong></p>
+  <p><strong>消息公布当天，李宁盘中高开超 7%，涨势只维持了半天；截至 6 月 3 日收盘，股价两日累计下跌 2.07%。</strong></p>
+  <p>运动品牌的球星代言价值主要有两种 ——</p>
+  <p>一是 “战力带货”，即靠球星在赛场上的表现直接拉动销售，38 岁、濒临退役的库里具有 “不确定性”。其二是 IP 的整体价值，乔丹在退役后，个人品牌依旧大卖，但这需要漫长的时间投入与沉没成本。</p>
+  <p>从这些层面看，李宁此刻签约库里，已错失了这一天才球员的 “战力巅峰” 期，资本市场也相对厌恶长周期带来的风险。<strong>关键在于，李宁这笔钱花得到底值不值？</strong></p>
+  <p>2013 年，李宁和耐克都有意签约库里。当时的库里不过是个刚打出点名气的年轻人，右脚的伤病也让品牌们犹豫。正是此时，安德玛诚意邀约，双方最终以每年 400 万到 500 万美元的价格达成合作。后面的故事，堪称体育营销的教科书。</p>
+  <p>随着库里身价飙升，安德玛的篮球业务狂飙突进。2015 年，库里一代签名鞋 “Curry 1” 创下 1.6 亿美元销售额，安德玛篮球鞋销量当年激增 350%，公司整体营收也从 2013 年的 23.3 亿美元跃升至 40 亿美元。<strong>从消费心智看，库里与安德玛的绑定仍然牢固。</strong></p>
+  <p class="image-wrapper"><img data-img-size-val="957,627" src="https://img.36krcdn.com/hsossms/20260604/v2_578072eb573645518a7d7d61cf9d2d9c@394564713_oswg91827oswg957oswg627_img_png?x-oss-process=image/quality,q_100/format,jpg/interlace,1"></p>
+  <p class="img-desc">图片截自官方微博</p>
+  <p>2025 年 11 月，库里与安德玛的合作到期，李宁再度迎来了出手机会。</p>
+  <p><strong>美国著名体育记者沙姆斯・查拉尼亚（Shams Charania）在社交媒体称：“我们之前看到库里穿过不同的鞋，最终让他感觉最舒服的，是德维恩・韦德与吉米・巴特勒的签名鞋款。”</strong></p>
+  <p>这两大产品皆来自李宁。</p>
+  <p>2018 年，李宁与即将退役的韦德签下终身合约，为其创立子品牌 “韦德之道”（Way of Wade），成为公司运作最成熟、最成功的案例之一。与韦德的合作模式不同，李宁对巴特勒的市场策略更偏职业化，双方共同推出的 Jimmy Butler 1 代、2 代，主打高端实战性能。</p>
+  <p>然而，让库里放弃其他更优渥报价、选择李宁的原因，不仅有队友的推荐。</p>
+  <p>在查拉尼亚补充的表述中，李宁和安踏是最后争夺库里的两个品牌，李宁 “后来居上” 的原因在于 “其给库里的是一种多样化的投资组合，不是一对一的直接签约”。</p>
+  <p>李宁提供的资料也显示，其与库里将共同运营品牌 Curry Brand，产品涵盖篮球鞋、高尔夫用品以及运动生活。<strong>双方将以品牌共建为基础，共同探索李宁品牌与库里品牌全球化发展的更多可能。未来，还会推出独立的 Curry Brand 门店。</strong></p>
+  <p><strong>这些安排都指向一个方向：李宁想让 Curry Brand 成为下一个 Air Jordan。</strong></p>
+  <p class="image-wrapper"><img data-img-size-val="1266,1475" src="https://img.36krcdn.com/hsossms/20260604/v2_7c9a71630f54411cb9911cdbc0ed2b0d@394564713_oswg1221924oswg1266oswg1475_img_png?x-oss-process=image/quality,q_90/format,jpg/interlace,1"></p>
+  <p class="img-desc">36 氪根据公开数据不完全统计</p>
+  <p>在中国运动市场，李宁的地位毋庸置疑。其创始人知名运动员的身份，让这一品牌拥有强大的号召力与国民感知力。</p>
+  <p><strong>但 Air Jordan 的传奇复制难度不小。</strong></p>
+  <p><strong>业内普遍的感知是，Air Jordan 的成功既有耐克的孤注一掷，也叠加了 “电视霸权时代” 以及全球篮球市场高速增长的红利。反观当下，年轻人对篮球赛事的狂热，已不复往昔。</strong></p>
+  <p>从收视数据上看，NBA 的困境已经相当明显。2025 年，NBA 总决赛第一场的电视收视率总数不到 1100 万，相较于 2023 年下降了 5%。有报道称，2025 年 NBA 总决赛第二场全球观众仅 860 万人次观看，创下自 2007 年以来最低纪录。</p>
+  <p>如果说收视率的下降更多来自短视频媒体碎片式的传播分流，体育品牌的财报数据则能更直观地反映出行业下滑的态势。</p>
+  <p>2025 年财报显示，李宁篮球品类的流水同比下降 19%。这背后既有篮球运动整体处于低迷的现状，也有公司在过去两三年的主动调控。</p>
+  <p>财报会上，李宁集团执行董事、联席 CEO 钱炜也明确表示，“我们认为保持这样的投入和市场领先占位，也许在篮球品类回暖之前，能够继续快速扩大市场份额”<strong>“篮球品类对于李宁十分重要、万分重要，越是这样的市场环境，我们越是要坚持把品类深耕。” 另有内部人士告诉 36 氪，与库里的签约，被李宁公司内部视作全球化的关键落子。</strong></p>
+  <p>但这份逆势出手的信心，至少短期内难以在报表上兑现。</p>
+  <p>摩根大通指出，构建一个成熟品牌矩阵至少需要 15 到 18 个月，而合同带来的摊销成本和研发支出从 2026 年就已开始产生。不过摩根大通也认为影响可控，预测李宁今年广告和促销的费用将占总销售额的 12%。近年来，这一数据基本控制在 9% 左右。</p>
+  <p>截至发稿前，包括摩根大通、中金在内的诸多机构，仍给于李宁增持或买入评级。</p>
+  <p>李宁这场 “迟来的豪赌”，对标的或许从不是库里剩余的职业生命，而是中国篮球市场乃至全球篮球文化的下一个十年。唯一的问题是，投资者有没有足够的耐心。</p>
+  <p class="image-wrapper"><img data-img-size-val="901,518" src="https://img.36krcdn.com/hsossms/20260604/v2_2379c9ec57b9453fa40b39c0dae841c4@394564713_oswg68085oswg901oswg518_img_png?x-oss-process=image/quality,q_100/format,jpg/interlace,1"></p>
+  <p class="img-desc">关注获取更多资讯</p>
+ 
+]]></content>
+      <categories>
+        <category>科技</category>
+      </categories>
+      <tags>
+        <tag>36氪</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>深创投领投，这家微型关节模组企业完成数千万融资丨 36 氪首发</title>
+    <url>/2026/06/04/%E6%B7%B1%E5%88%9B%E6%8A%95%E9%A2%86%E6%8A%95%EF%BC%8C%E8%BF%99%E5%AE%B6%E5%BE%AE%E5%9E%8B%E5%85%B3%E8%8A%82%E6%A8%A1%E7%BB%84%E4%BC%81%E4%B8%9A%E5%AE%8C%E6%88%90%E6%95%B0%E5%8D%83%E4%B8%87%E8%9E%8D%E8%B5%84%E4%B8%A836%E6%B0%AA%E9%A6%96%E5%8F%91/</url>
+    <content><![CDATA[<blockquote>
+<p>原文链接：<a href="https://36kr.com/p/3837650456430851?f=rss">https://36kr.com/p/3837650456430851?f=rss</a></p>
+</blockquote>
+  <p>作者丨欧雪</p>
+  <p>编辑丨袁斯来</p>
+  <p>硬氪获悉，微型高性能电机企业指尖智擎近期完成数千万元 Pre-A 轮融资，由深创投领投，天启资本与卓源亚洲跟投。资金将主要用于新一代微型轴向磁通电机的量产爬坡、空心杯电机产线建设及全球头部客户的供应链交付保障。多维资本担任本轮独家财务顾问。</p>
+  <p>指尖智擎成立于 2024 年 8 月，公司主打产品包括微型轴向磁通关节模组与空心杯电机，核心应用场景覆盖灵巧手、消费级机器人、轻型机械臂及医疗设备等领域。公司创始人张杨拥有 12 年电机行业经验，曾就职于美的、威孚高科、图达通等企业。</p>
+  <p class="image-wrapper"><img data-img-size-val="1080,607" src="https://img.36krcdn.com/hsossms/20260604/v2_538618f320a445f080c6900287a5e6ab@6221844_oswg339620oswg1080oswg607_img_000?x-oss-process=image/format,jpg/interlace,1"></p>
+  <p class="img-desc">φ16mm 微型关节模组（图源 / 企业）</p>
+  <p>目前，人形机器人灵巧手的主流技术路径存在精度、自由度、扭矩密度及成本方面的明显短板，行业长期面临 “小型化、高性能、低成本” 难以兼得的难题。</p>
+  <p>指尖智擎的采用自研微型轴向磁通电机 + PCB 绕组 + 摆线减速器的组合。公司产品最小外径 16 毫米，最大 30 毫米，走小型化的差异路线。以 16mm 规格为例，电机最大连续转矩大于 7.8mNm，电驱总成最大连续转矩可达 0.10-0.31Nm，传动效率 80%-88%。</p>
+  <p>在技术路线上，公司有三个核心特点：一是采用轴向磁通电机，区别于传统径向磁通结构；二是电机全部采用 PCB 绕组工艺，避开特微型电机绕线困难的桎梏，大幅提升精度及一致性；三是减速器采用摆线方案，兼顾成本及可靠性。</p>
+  <p>张杨表示：“我们切入市场较晚，所以必须另辟蹊径，做差异化、小型化，同时技术路线要有前瞻性，才能保证后面不会被淘汰。”</p>
+  <p>指尖智擎目前微型关节模组产品线已经基本搭建完成，已有 4 个标准品尺寸以及多个定制开发项目在研，其空心杯电机产品线也将在今年内陆续补全。</p>
+  <p class="image-wrapper"><img data-img-size-val="1080,607" src="https://img.36krcdn.com/hsossms/20260604/v2_cc34291750304e46bee88985c80cc626@6221844_oswg502136oswg1080oswg607_img_000?x-oss-process=image/format,jpg/interlace,1"></p>
+  <p class="img-desc">φ4mm 和 φ5mm 特微型空心杯电机（图源 / 企业）</p>
+  <p>目前，公司团队规模超 100 人，在苏州工业园区拥有约 9000 平方米的研发中心与工厂，具备年产 10 万台微型关节模组的生产能力，三季度年产能可达 20 万台。</p>
+  <p>在商业化方面，公司已取得实质性进展。目前灵巧手相关客户占公司营收约 60%-70%，公司已与多家头部客户签订协议并推进深度合作，其中已与两家头部公司敲定战略开发合作。</p>
+  <p><strong>以下为硬氪与张杨的对话节选：</strong></p>
+  <p><strong>硬氪：市面上也有其他公司在做轴向磁通电机、PCB 绕组或摆线减速器，指尖智擎的核心差异在哪里？</strong></p>
+  <p><strong>张杨：</strong>从 2024 年底我们开始推这个方案之后，市场上确实有不少公司在跟进，但他们做的都是比较大的产品，而且也没有看到成熟的产业化落地。哪怕有厂家也在做轴向磁通电机、摆线减速器、PCB 绕组方案，但他们都没有把这些技术结合在一起做微型化。我们的核心差异和最大优势就是微型化，这就是我们最大的护城河。</p>
+  <p><strong>硬氪：你们怎么看待灵巧手目前的可靠性问题？</strong></p>
+  <p><strong>张杨：</strong>现在行业里宣传手的寿命都是按百万次算，但换算一下，如果一秒钟开合一次，200 万次也就 200 多个小时，连家用电器的可靠性标准都达不到，而且这是空载，如果带载寿命缩减到可能只有十分之一。我们目前在积极推进可靠性测试验证提升，从材料、结构、工艺多个维度去优化。相比行业内其他方案，我们在这方面的优势已经比较明显了。手要真正在工业和家庭场景落地，可靠性的提升是亟待解决的。</p>
+  <p><strong>硬氪：你们不自己做整机，那未来还有哪些想象空间？</strong></p>
+  <p><strong>张杨：</strong>我们定位很清晰，就是做 “卖铲子的人”。零部件公司也可以成为伟大的公司。本质上，指尖智擎的定位是一家微型电机公司，下游应用场景不只是灵巧手或者是机器人，微型电机本身是一个非常大的市场，覆盖消费电子、医疗、工业自动化等多个行业，场景非常广，我们已经有一些很有前景的其他项目在做了。</p>
+  <p>我们不会去干下游的事，把自己做成微型高性能电机领域的标杆企业就够了，市场和估值空间已经很大了。不是不能做，而是没必要。况且很多客户担心我们做下游，不是聪明的打法。</p>
+  <p><strong>投资方观点：</strong></p>
+  <p><strong>本轮融资领投方深创投表示：</strong>“具身智能是未来十年最确定的科技浪潮之一。我们发现，指尖智擎不仅是技术上的‘无人区’开拓者，更是量产上的‘实干家’。其将半导体工艺引入电机制造的思路极具颠覆性，团队既精通电磁场技术，又深谙供应链管理，我们坚定看好指尖智擎成为机器人微型关节模组领域的核心动力引擎。”</p>
+  <p><strong>天启资本与卓源亚洲认为：</strong>指尖智擎精准卡位微型执行器这一产业链核心瓶颈，其独创的 PCB 轴向磁通技术路线不仅打破了海外技术垄断，更具备了稀缺的规模化量产能力。在具身智能从 “实验室” 走向 “生产线” 的爆发前夜，指尖智擎无疑占据了极具战略价值的生态位。</p>
+ 
+]]></content>
+      <categories>
+        <category>科技</category>
+      </categories>
+      <tags>
+        <tag>36氪</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>深圳具身公司获得汇川、中国电信亿元融资，“视触觉” 传感器出货量行业第一｜硬氪首发</title>
+    <url>/2026/06/04/%E6%B7%B1%E5%9C%B3%E5%85%B7%E8%BA%AB%E5%85%AC%E5%8F%B8%E8%8E%B7%E5%BE%97%E6%B1%87%E5%B7%9D%E3%80%81%E4%B8%AD%E5%9B%BD%E7%94%B5%E4%BF%A1%E4%BA%BF%E5%85%83%E8%9E%8D%E8%B5%84%EF%BC%8C%E2%80%9C%E8%A7%86%E8%A7%A6%E8%A7%89%E2%80%9D%E4%BC%A0%E6%84%9F%E5%99%A8%E5%87%BA%E8%B4%A7%E9%87%8F%E8%A1%8C%E4%B8%9A%E7%AC%AC%E4%B8%80%EF%BD%9C%E7%A1%AC%E6%B0%AA%E9%A6%96%E5%8F%91/</url>
+    <content><![CDATA[<blockquote>
+<p>原文链接：<a href="https://36kr.com/p/3837269482091656?f=rss">https://36kr.com/p/3837269482091656?f=rss</a></p>
+</blockquote>
+  <p>作者｜黄楠</p>
+  <p>编辑｜袁斯来</p>
+  <p>硬氪获悉，戴盟机器人近日完成亿元 A 轮融资，由汇川技术旗下产业基金汇川产投与中国电信联合投资。资金将用于进一步打造超大规模含物理交互信息数据集，加速物理世界模型研发、并驱动真实物理场景下的数据飞轮与商业闭环。</p>
+  <p>戴盟机器人于 2023 年正式运营，核心团队长期聚焦机器人灵巧操作与物理交互智能领域。联合创始人兼首席科学家王煜教授曾任港科大机器人研究院创始院长，他所提出的 “具身技能” 与 “技能克隆” 等概念，是戴盟机器人核心技术路线的重要组成部分。创始人兼 CEO 段江哗博士及主要技术负责人，均来自港科大机器人研究院核心团队，具备 10 年操作智能 Know-how。首席 AI 科学家原玮浩曾为阿里通义实验室多模态研究专家，拥有将世界模型迁移至机器人物理操作的前沿经验。</p>
+  <p>具身智能热度持续走高的当下，行业逻辑正在发生深刻切换。赛道发展沿着一条清晰的脉络演进：从早期机器人行走与运动控制能力的比拼，到差异化算法架构路线与 “具身大脑” 的探索，每轮热点轮动都为其突破积累了关键基础。</p>
+  <p>随着人形落地从舞台演示走向实景作业，整机精细化实操门槛持续抬升，能否采集高质量物理交互数据，已经成为行业落地的关键分水岭。</p>
+  <p>在主流的纯视觉感知方案中，传感器仅能捕捉物体外观，无法识别软硬、摩擦系数、受力形变等物理特征，难以支撑机器人预判物体变化。相较之下，融合触觉的物理交互数据，可完整记录瞬时受力、材料属性等关键参数，在模型规模化训练中沉淀物理常识、加速收敛，帮助机器人建立物理因果认知，落地各类精细作业。</p>
+  <p>戴盟的做法是从物理交互数据的采集和标注切入，逐步搭建起覆盖感知、操作、学习的完整技术链路，进而构建能为机器人提供物理常识的世界模型。</p>
+  <p>在认知层面，其模型可以实现视觉与触觉模态的对齐，使机器人能够从图像中推断物体的物理属性，也能从触感中反推物体形态；进入执行阶段，借助高响应频率的触觉反馈，帮助设备在接触发生的毫秒级时间内完成感知、判断与动作修正，形成闭环控制。</p>
+  <p class="image-wrapper"><img data-img-size-val="568,284" src="https://img.36krcdn.com/hsossms/20260603/v2_4ba21fa16c334f4f9da385d4fae9d9a5@6022551_img_gif?x-oss-process=image/quality,q_80"></p>
+  <p class="img-desc">以物理直觉实现串葡萄、放置鸡蛋等精细操作（图源 / 企业）</p>
+  <p>“机器人要能干活，对物理世界因果的理解和基于真实接触的反馈必不可少。” 戴盟机器人 CEO 段江哗告诉硬氪，一个能跑酷、能翻跟头的机器人，如果它没办法以恰到好处的力度拿起一块海绵擦拭物体，其应用价值将大打折扣。“视觉属于非接触的远端信号，它能告诉你物体在哪里，却无法告诉你接触时，为什么海绵会产生形变，而触觉，正是那个接触瞬间的‘手感’，是判断物理因果、实现精细操作的关键。”</p>
+  <p>但仅有技术和模型还不够。如何以数据闭环与专业评测标准驱动物理世界模型持续迭代，是当前业界面临的另一大挑战。段江哗向硬氪指出，“触觉数据荒的本质在于，视觉的数据表征方式已经相对统一，而触觉没有标准，也缺乏大规模、多模态的真实采集体系。”</p>
+  <p>为解决这一难题，戴盟自建了 “外发式” 具身数据采集网络，与传统依赖定点实验室、遥操作采集的模式不同，“外发式” 采集网络通过将中心化实验室分散，实行分布式社会化采集，可以有效实现场景的真实性、采集效率的质变和边际成本的递减。</p>
+  <p>2026 年 4 月，戴盟机器人已联合包括谷歌 DeepMind 等数十家海内外头部机构，发布全球最大规模的含触觉全模态物理世界数据集 Daimon-Infinity，其中包含了纹理、软硬、力学等接触信息，并开源 1 万小时供行业免费使用；在数据集基础上，还建立了一套系统化的评测标准，于 6 月推出支持 “真实数据训练 + 仿真器训练” 两种模式、面向物理交互能力的含触觉全模态 Benchmark 体系 RobOmni。</p>
+  <p>人类婴儿通过触摸来认识世界，发展智力。对于即将从工厂走进家庭的机器人而言，这一课也同样无法跳过。在解决了 “看得见” 和 “走得稳” 之后，“摸得准” 正成为具身智能通往物理世界的最后，也最关键的 “一公里”。而戴盟机器人，正试图在这场关于 “手感” 的技术进程中，定义自己的标准。</p>
+  <p>人类婴儿通过触摸来认识世界，发展智力。对于即将从工厂走进家庭的机器人而言，这一课也同样无法跳过。在解决了 “看得见” 和 “走得稳” 之后，“摸得准” 正成为具身智能通往物理世界的最后，也最关键的 “一公里”。戴盟向硬氪透露，其视触觉传感器出货量目前已居全球第一。它正试图在这场关于 “手感” 的技术进程中，定义自己的标准。</p>
+  <p><strong>以下为硬氪与戴盟机器人 CEO 段江哗的访谈节选（略经编辑）：</strong></p>
+  <p><strong>硬氪：从感知到执行，具身智能要跨越从 “看懂” 到 “干活” 的鸿沟。戴盟的物理世界模型是如何处理视触觉模态融合与底层控制的？在面对复杂操作任务时，这套架构能帮助机器人完成哪些之前做不到的事？</strong></p>
+  <p><strong>段江哗：</strong>我们的模型推理的是物理因果。在模型结构上，我们把物理接触拆成了两层，分别是认知层和执行层。</p>
+  <p>认知层做的事是让视觉和触觉在同一语义空间里双向映射，<strong>这类似于人类的通感。</strong>你看到一颗草莓，不用捏下去就知道草莓会有颗粒感；当你掏钥匙开门，钥匙插进门锁的那一刻，手会挡住视线，在看不到钥匙和锁孔接触状态的情况下，人类会依靠直觉和手感完成操作 —— 有没有插进去、有没有卡住、要不要转一下？我们希望机器人也能做到这件事。</p>
+  <p class="image-wrapper"><img data-img-size-val="1866,1050" src="https://img.36krcdn.com/hsossms/20260603/v2_88839848d20a49048347085d1742c11e@6022551_oswg3349491oswg1866oswg1050_img_png?x-oss-process=image/quality,q_80/format,jpg/interlace,1"></p>
+  <p class="img-desc">戴盟机器人用夹爪抓取鸡蛋（图源 / 企业）</p>
+  <p>执行层有两套机制在同时运行。一套是百赫兹级的高频触觉伺服，类似脊髓反射，不经过上层推理，物体刚开始产生滑移趋势的那一刻，补偿动作就已经发出了，视觉帧还没切换过来。<strong>这好比你在洗碗时，手里沾满洗洁精的盘子刚有一点点滑脱的迹象，你不需要用眼睛去盯着确认，手指就会立刻本能地收紧捏住盘子。</strong></p>
+  <p>另一套是物理世界推理，模型会持续预测未来几步的操作状态，在失误真正发生之前提前给出修正策略。<strong>这好比你单手提着一个水壶往杯子里倒水，随着水流出，壶底的重心在持续变化，你的大脑会根据水的流速，持续预测下一秒壶的重量分布，提前并且平滑地调整手腕的倾斜角度，确保水流自始至终倒得平稳。</strong></p>
+  <p>这两套机制分别对应毫秒级反应和多步前瞻，时间尺度不同，但在同一个任务里协同工作。这是我们相比纯视觉操作模型最重要的结构差异。</p>
+  <p><strong>硬氪：戴盟最近还陆续发布了数据集和面向机器人物理交互能力的 Benchmark，这跟你们在做的物理世界模型有什么联系？</strong></p>
+  <p><strong>段江哗：</strong>数据集是燃料，物理世界模型是引擎，Benchmark 是转速表。</p>
+  <p>传统的数据集，不管是视觉的还是仿真的，记录的是 “像素变化” 或者 “轨迹”。但要让机器人理解物理世界，光有这些远远不够。比如一个物体是软的还是硬的？表面是光滑的还是粗糙的？抓握时正压力多大、切向力多大、有没有滑移趋势？这些都属于物理属性信息。Daimon-Infinity 数据集中所采集的压力、形变、纹理、刚度、滑移趋势…… 加起来有十几种模态。</p>
+  <p>最大的难度，不是单独采集某一种模态，而是要把这十几种触觉模态，跟视觉图像、跟动作指令，在毫秒级的时空维度上严格对齐。</p>
+  <p class="image-wrapper"><img data-img-size-val="3148,1508" src="https://img.36krcdn.com/hsossms/20260603/v2_d7d3708541eb4c90a5e66a636c31aa6b@6022551_oswg4059125oswg3148oswg1508_img_png?x-oss-process=image/quality,q_80/format,jpg/interlace,1"></p>
+  <p class="img-desc">戴盟机器人实现自主穿葡萄任务（图源 / 企业）</p>
+  <p>举个例子，机器人手指碰到物体的那一刻，触觉传感器要记录下接触点的压力分布、纹理信息，同时摄像头要记录下这一刻的画面，控制系统要记录下这一刻的关节角度和力矩。<strong>这三者必须在时间上精确到毫秒级同步，否则模型难以学到到正确的因果逻辑。</strong></p>
+  <p>数据有了，模型有了，下一个问题随之而来 —— 怎么判断模型是否真的学到了物理因果？这就是戴盟推出 RobOmni 的意义。</p>
+  <p>具身领域现有基准评测往往侧重视觉感知模态，重点关注机器人的泛化抓取和长序列规划任务，针对触觉感知模态，接触精细操作的评估标准还没有完善。</p>
+  <p>行业仍然缺乏围绕触觉感知与灵巧操作的标准化评测基准，不同模型与数据之间缺乏统一标准，触觉能力难以量化，模型泛化能力也难以被系统性验证。</p>
+  <p>我们注意到，一些侧重仿真和 Sim2Real 领域的团队，近期也开始引入视触觉融合评估，这恰恰说明整个产业前沿正在达成共识 —— 让机器人真正理解世界并与世界交互，纯视觉是不够的，触觉是绕不过去的。<strong>RobOmni 正填补了这一缺口，为物理交互能力提供标准化、可比较、可复现、可扩展的验证入口。</strong></p>
+  <p>没有尺子，就无法度量进步，没有标准，行业就无法形成合力，所以我们要先造一把尺子，再丈量世界。</p>
+  <h4><strong>投资方评论：</strong></h4>
+  <p><strong>汇川产投相关负责人</strong>表示，具身智能要想实现真实场景作业的跨代跃迁，触觉感知补齐物理因果逻辑是必经之路。戴盟机器人是业内极少数从物理因果逻辑出发，以海量视触觉数据驱动，推动物理世界模型在精细操作场景落地的企业，汇川技术长期深耕工业自动化与智能机器人领域，深知多模态感知对精细操作场景的战略价值。未来期待基于汇川的场景与产业认知，与戴盟共同构建具身智能时代的触觉神经网络。</p>
+  <p><strong>中国电信投资公司相关负责人</strong>表示，具身智能想要实现大规模商业化落地，既离不开云端大模型算力的持续迭代升级，也高度依托高精度物理感知能力与多模态数据体系作为支撑。戴盟机器人在视触觉感知赛道深耕积淀，已构建起稳固的核心技术壁垒。作为数字中国建设的中坚力量，中国电信正全力落地 “云改数转智惠” 战略。未来，我们期待与戴盟机器人深度携手，联合打造可落地、可复制的具身智能行业解决方案，共建赋能新质生产力发展的新型数字基础设施，助力加速具身产业高质量发展，实现生态共赢。</p>
+ 
+]]></content>
+      <categories>
+        <category>科技</category>
+      </categories>
+      <tags>
+        <tag>36氪</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>36 氪独家｜2026 年字节 AI 的四个关键命题</title>
+    <url>/2026/06/04/36%E6%B0%AA%E7%8B%AC%E5%AE%B6%EF%BD%9C2026-%E5%B9%B4%E5%AD%97%E8%8A%82-AI-%E7%9A%84%E5%9B%9B%E4%B8%AA%E5%85%B3%E9%94%AE%E5%91%BD%E9%A2%98/</url>
+    <content><![CDATA[<blockquote>
+<p>原文链接：<a href="https://36kr.com/p/3838454229027072?f=rss">https://36kr.com/p/3838454229027072?f=rss</a></p>
+</blockquote>
+  <p><strong>文｜周鑫雨</strong></p>
+  <p><strong>编辑｜张雨忻 杨轩</strong></p>
+  <p>《智能涌现》从多个信源处独家获悉，2026 年，字节 AI 有四个重要的命题：</p>
+  <p><strong>加大对世界模型训练的投入，年底前，模型</strong>性能达到现阶段世界模型全球 &nbsp;SOTA（最佳）Google Genie 3 的水平。</p>
+  <p><strong>视频模型继续保持领先地位，</strong>探索 “动态生成” 等新方向。</p>
+  <p><strong>进一步打好&nbsp;Coding 的地基，</strong>做好 Coding 的 Dogfooding（数据回流、评测，形成飞轮），提升 Agent 能力。</p>
+  <p><strong>豆包强化商业化能力，</strong>重点场景是 “办公”。</p>
+  <h2><strong>字节的未竟之地：世界模型</strong></h2>
+  <p>如今，字节的 AI 矩阵中，有让字节终于得以进入中国大模型第一梯队的 Seed 2.0，还有做到世界 SOTA 水平的 Seedance 2.0，另外在应用侧，豆包也形成了断层式领先 ——<strong> 我们从多方了解到，2026 年春节过后，豆包&nbsp;DAU&nbsp;达到 2 亿</strong>。</p>
+  <p>“没有明显短板。” 一名大厂 AI 战略如此评价字节的 AI 业务矩阵。</p>
+  <p>但在一众模型中，唯独少了大模型研究下一阶段的关键：世界模型。</p>
+  <p>几名接近 Seed 团队人士告诉我们，字节是入场世界模型赛道较晚的玩家。<strong>2024 年，刚从阿里加入字节的周畅，扛起了世界模型研究的大旗</strong>。</p>
+  <p><strong>但当时内部的判断是，世界模型路线和商业化场景还不明确，更重要的是打好视频模型的仗。</strong></p>
+  <p>直到 2025 年，字节才在小范围内成立研究组，开始对世界模型中的 VLA（视觉 - 语言 - 动作模型）路线进行探索。带队人有两位：</p>
+  <p>一是字节 AI Lab 负责人李航 ——2025 年 4 月，AI Lab 整体（包含 Robotics 团队）并入了 Seed，目的之一是提升模型和应用（具身智能）之间的沟通效率 —— 主要基于仿真数据进行世界模型训练。</p>
+  <p>另一位是 Seed 多模态研究员王文千，主要基于自然数据做训练。</p>
+  <p>来到 2026 年，吴永辉终于在 Seed 全员会上为世界模型设立了一个明确的目标：<strong>2026 年底之前至少发布一版世界模型，性能对标目前的世界 SOTA（最佳）——&nbsp;Google 在 2025 年 8 月发布的 Genie 3</strong>。</p>
+  <p>但从目前的进度来看，追赶的速度不够。一位接近 Seed 人士告诉我们，吴永辉多次在 Seed 内部会直言字节世界模型和具身智能的效果不及预期。</p>
+  <p>另有 Seed 成员透露，根据内部评测，截至 2026 年初，字节世界模型的综合性能距离全球 SOTA 还存在 10% 的差距。</p>
+  <p>但这场仗代表未来。</p>
+  <p>一方面，世界模型的下游，便是至少千亿美金体量的具身智能市场，以及想象空间极大的游戏和娱乐场景。</p>
+  <p>一名前 Seed 研究员曾对我们表示，字节机器人此前的落地场景主要为物品运输、工业搬运，但内部判断天花板较低，“市场前景更广阔的人形机器人是字节一定会入局的方向。”</p>
+  <p>另一方面，世界模型的路线仍然存在诸多非共识，包括视频生成派、VLA（视觉 - 语言 - 动作模型）派、JEPA（像素预测）派等。</p>
+  <p>“赌，以字节的人才密度和资金投入，大概率能赢。” 一名 AI 投资人对我们分析，“不赌，则一定会输。”</p>
+  <p>围绕跻身世界第一梯队的目标，2026 年以来，字节针对世界模型训练，也已经做了不少调整。</p>
+  <p>《智能涌现》得知，2026 年春节后，<strong>Seed 新设立了一支世界模型研究组，负责人为前 Meta FAIR Lab 研究员范浩奇，汇报给 Seed 多模态和世界模型负责人周畅；</strong></p>
+  <p><strong>与此同时，原来李航和王文千带领的两个 VLA 研究组合并，统一向周畅汇报。</strong></p>
+  <p>多名知情人士告诉《智能涌现》，原来李航和王文千的研究组所探索的路线，主要是 VLA，追求 “即兴”、“真实”，目标应用场景是具身智能；而范浩奇带领的新队伍走的则是 3D 仿真路线，主打娱乐和游戏这类应用场景。</p>
+  <p>除了人力和探索路线的扩张，世界模型在资金投入上也是文本、Coding、视频等多个模型方向中最高的一个。</p>
+  <p>很显著的是数据预算。一名字节数据平台的员工告诉我们，训练数据 “走量” 的策略，此前在 LLM（大语言模型）和 Seedance 2.0 上取得了显著收益，团队计划将同样的 “数海战术” 应用在世界模型的训练上。</p>
+  <p>这也对应着更高昂的数据投入 —— 我们从多方了解到，2026 年，字节批给世界模型的训练数据（包括 VLA、长视频、3D 等模态）的预算，在各个模态中是最高的，金额达到数千万元。</p>
+  <p><strong>一名数据供应商提到，字节在世界模型上的数据投入，能达到其它厂商的 3-4 倍。</strong></p>
+  <h2><strong>Coding ：追求更极致的数据工程</strong></h2>
+  <p>Coding 能力是基础，是决定 Agent 效果上限的关键 —— 这已成为业界的共识。</p>
+  <p>多名知情者曾对我们提及字节对 Coding 的重视。“字节对 Coding 的投入一直很高，仅次于今年的世界模型。” 有接近 Seed 的人士告诉《智能涌现》。</p>
+  <p>比如，内部会定向采购数据，或是研究 Claude Code、CodeX 等海外顶尖 Coding 模型的训练数据 demo。</p>
+  <p>在 2025 年的火山引擎 Force 大会上，字节跳动技术副总裁洪定坤也表示，Coding 作为一种高度结构化、逻辑严密的任务，对模型理解复杂的语义结构、逻辑推理、算法设计和精确表达都有很高的要求，能助力模型智能上限的探索。</p>
+  <p>但在外界，字节 Coding 业务的存在感一直不强。无论是 2025 年 11 月发布的模型 Doubao-Seed-Code，还是 2025 年初发布的 AI 编程工具 Trae，效果和声量都不及智谱的 GLM 5 和月之暗面的 K2。</p>
+  <p><strong>“字节 Coding&nbsp;效果难以取得突破的原因在于缺少数据回流。”</strong>一名知情者评价。由于模型能力有限，字节相关业务都不愿意使用 Seed-Code。</p>
+  <p>就连 AI Coding 应用 Trae，最早接入的也是 DeepSeek 和 Claude Code，以及产品内部自己训练的 Coding 模型。</p>
+  <p>这就导致，字节 Coding 模型缺少来自真实应用场景的反馈。</p>
+  <p>2026 年以来，不少字节员工感受到，各个业务方正在加大对 Seed 模型的支持力度。一名 Seed 员工告诉《智能涌现》，原来字节并不限制业务侧使用第三方 Coding 模型做开发，但 2026 年以来，多个应用部门被强制要求使用 Seed 模型。</p>
+  <p>不过，在更极致的数据投入下，Seed 在人才招聘上的速度倒是稍有放缓。</p>
+  <p>有 AI 圈猎头告诉《智能涌现》，字节 HR 现在对外释放的信号是：粗放高薪招聘的时代已经结束了，接下来的命题是内部培养、提拔年轻人才，提高算法待遇。</p>
+  <p>如今，Seed 为数不多的招聘口子，主要开放给了来自 DeepSeek，以及 OpenAI、DeepMind、Meta 等海外大厂的 AI 人才，比如前 DeepSeek 核心成员郭达雅、前英伟达研究员董鑫。</p>
+  <h2><strong>Seedance 如何保持 SOTA 地位</strong></h2>
+  <p>2026 年字节在 AI 模型上的另一个重点，则是维持 Seedance 在全球视频生成领域的 SOTA 地位。</p>
+  <p>“Seedance 2.0 的胜利，是数据的胜利。” 某视频生成初创企业的创始人曾对《智能涌现》这样评价 Seedance 2.0。我们得知，<strong>庞大的训练数据量和超过&nbsp;2000 人的评测团队，造就了 Seedance 2.0 的亮眼效果。</strong></p>
+  <p>但持续靠 “走量” 的训练方式也存在隐忧。一些研究表明，视频生成领域存在 “Anti-Scaling Law” 现象，简单而言，训练数据越多，模型越容易 “偷懒”，只学习某些关键帧，而忽视完整叙事 —— 因此，越到训练后期，数据 “走量” 的收益往往越低。</p>
+  <p>两名数据侧的知情人士告诉我们，<strong>Seedance 在预训练上已经做到了天花板，接下来想要提升性能，就必须清洗训练数据，进行更精细的后训练。</strong></p>
+  <p>与此同时，<strong>“动态生成” 能力是 2026 年&nbsp;Seedance 团队关注的新方向。</strong></p>
+  <p>所谓的 “动态生成”，也就是互动视频，指的是用户可以输入指令，随时调整视频生成的内容和剧情。在这一赛道上，已经跑出了估值高达 13.2 亿美金的 Vivix AI（前商汤高级研究总监刘宇创立）。</p>
+  <p>多名知情者告诉《智能涌现》，周畅一直十分看好动态生成的落地前景。</p>
+  <p>“互动视频可以做成小游戏，也可以做互动剧集，同时也能和世界模型的探索接轨（视频生成也是世界模型的一条探索路径）。” 一名接近 Seed 人士表示。</p>
+  <h2><strong>加速豆包的商业化和出海</strong></h2>
+  <p><a target="_blank" rel="noopener noreferrer" href="https://mp.weixin.qq.com/s?__biz=MzkwMDQ2NDU2Nw==&amp;mid=2247516670&amp;idx=1&amp;sn=d758714f4f20d794c9ea271689d931b9&amp;scene=21#wechat_redirect">36 氪曾独家报道</a>，豆包预计将在 6 月下旬正式上线付费内容；与此同时，豆包也在计划与抖音电商打通，完善付费场景。</p>
+  <p>2026 年 5 月初，豆包曾在 App Store 中更新过付费订阅方案，月订阅价格在免费到 500 元不等。</p>
+  <p>6 月 3 日，豆包官方也宣布，即将针对专业人群的生产力需求推出 “豆包专业版”，包含软件开发、数据分析、专业设计、流程自动化、金融分析、科学研究等专业服务。</p>
+  <p>多名知情者透露，春节后，<strong>豆包&nbsp;DAU&nbsp;已经突破 2 亿</strong>。“今年豆包的投流预算很低。” 在一名知情者看来，高 DAU 带来的是高昂的推理成本和运维压力，豆包在这个时间点推进商业化，带有降一降增长的增速，以及自我造血的双重目的。</p>
+  <p><strong>而&nbsp;PPT 生成，是豆包建立用户付费心智的核心切入点</strong>。“豆包希望加强 PPT 生成功能，是为了面向金融、法律等高净值行业的白领收费。” 一名接近豆包人士告诉《智能涌现》，<strong>下一阶段，豆包还计划推出企业版，与企业内部的系统打通，但内部仍在讨论具体的结合方式</strong>。</p>
+  <p>他表示，这一想法，是受到了海外模型商业模式的启发。目前，面向办公场景收费这条商业化路径，在海外已经得到了验证。据 Anthropic 披露的数据，Claude Code 上线仅 6 个月，ARR 就达到了 10 亿美元；上线一年后，2026 年 2 月的 ARR 已经达到了 25 亿美元。</p>
+  <p>面向企业开发场景的 Claude Code 带来的可观现金流，也让成立比 OpenAI 晚了 6 年的 Anthropic，在今年年初一跃反超 OpenAI 的 ARR。</p>
+  <p><strong>那么现在，豆包要解决的问题就是把自己的用户心智从一个可以免费问一切的 “通用入口” 转变为一个虽然要花钱但能帮你提高效率的 “办公助手”。</strong></p>
+  <p>不过，豆包想进入的这个市场已经开始拥挤。有豆包人士对智能涌现提到，在调研企业客户的过程中，字节发现企业 AI 工具市场已经被不少行业 AI 解决方案供应商占领，迟来的豆包必然要面对更高的获客成本。</p>
+  <p>《智能涌现》了解到，出海也是豆包今年的重要命题之一。</p>
+  <p>此前，据《界面新闻》报道，豆包海外版应用 Dola 在 2025 年底的 DAU 已经突破千万。《智能涌现》了解到，<strong>Dola 2026 年的增长目标为：年底达到 3000 万&nbsp;DAU。</strong></p>
+  <p>一名知情人士表示，小语种国家是 Dola 面向的主要市场。目前，海外 AI Chatbot 市场，已经基本被 ChatGPT、Claude、Gemini 占据。不在欧美市场与 “AI 御三家” 正面对抗，差异化切入小语种市场，是 Dola 的增长策略。</p>
+  <p>第三方数据显示，2025 年下半年以来，Dola 频频登上印尼、马来西亚、墨西哥等国家的应用商店下载榜。</p>
+  <p>——</p>
+  <p>加入字节一年来，吴永辉的命题就是带领 Seed 一边修 Bug，一边做 SOTA 模型。而 2026 年，在 AI 的每一个战场中，字节的目标都是做赢家。</p>
+  <p>如今，Seed 2.0、Seedance 2.0 成果初显，Seed 积累的工程、数据经验、人才，也将会以更高效的方式，复用到新一轮战争中。</p>
+  <p>（《智能涌现》作者邓咏仪对本文亦有贡献。）</p>
+  <p><strong>封面来源｜AI 生成、视觉中国</strong></p>
+  <p class="image-wrapper"><img data-img-size-val="1080,402" src="https://img.36krcdn.com/hsossms/20260604/v2_dd7dd36bc4424a5a9cfb6bf31dbe015d@5783683_oswg478457oswg1080oswg402_img_000?x-oss-process=image/format,jpg/interlace,1"></p>
+  <p class="img-desc">欢迎交流！</p>
+  <p class="image-wrapper"><img data-img-size-val="900,335" src="https://img.36krcdn.com/hsossms/20260604/v2_f066922910524f87a59f76f8907d6a1d@5783683_oswg225397oswg900oswg335_img_000?x-oss-process=image/format,jpg/interlace,1"></p>
+  <p class="img-desc">欢迎交流！</p>
+ 
+]]></content>
+      <categories>
+        <category>科技</category>
+      </categories>
+      <tags>
+        <tag>36氪</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>云台相机 2026 大乱斗，它到底怎么来的，又去往哪里？｜硬哲学</title>
+    <url>/2026/06/03/%E4%BA%91%E5%8F%B0%E7%9B%B8%E6%9C%BA-2026-%E5%A4%A7%E4%B9%B1%E6%96%97%EF%BC%8C%E5%AE%83%E5%88%B0%E5%BA%95%E6%80%8E%E4%B9%88%E6%9D%A5%E7%9A%84%EF%BC%8C%E5%8F%88%E5%8E%BB%E5%BE%80%E5%93%AA%E9%87%8C%EF%BC%9F%EF%BD%9C%E7%A1%AC%E5%93%B2%E5%AD%A6/</url>
+    <content><![CDATA[<blockquote>
+<p>原文链接：<a href="https://www.ifanr.com/1667991?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=">https://www.ifanr.com/1667991?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=</a></p>
+</blockquote>
+<p><img class="aligncenter size-full wp-image-1667993" src="https://s3.ifanr.com/wp-content/uploads/2026/06/1-3.png" alt="" width="1448" height="1086" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/1-3.png 1448w, https://s3.ifanr.com/wp-content/uploads/2026/06/1-3-360x270.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/1-3-768x576.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/1-3-1024x768.png 1024w" sizes="(max-width: 1448px) 100vw, 1448px"></p>
+<p>2016 年 9 月，离改变手机行业的 iPhone X 发布还有一年，但另一个改变行业产品 AirPods 初次登场。</p>
+<p>如今我们都已知道 TWS 耳机的爆发正是源于这款产品，但那年 9 月人们给它的评价却尽是嘲讽：「这不就是 EarPods 把线剪掉吗？」，「晃几下就掉了，蹲操场跑道一天能捡好几个…」，「苹果坏事做尽，砍 3.5mm 耳机接口，就是为了多赚我 1288 元」。</p>
+<p>2018 年 11 月，大疆 Osmo Pocket 云台相机发布，起初多数人也并不觉得自己需要在手机之外再添置一个手持摄影设备，尤其是它的屏幕还这么小。</p>
+<p>后来的事情我们都知道了，大疆 Osmo Pocket 3 成为了消费电子行业的现象级产品，人们确实意识到，手机之外还可以有一个手持摄影设备。</p>
+<p>正如 2016 年的 AirPods 确实看起来就像把 2012 年发布的 EarPods 把线剪掉一样，把云台搬上手持设备，旋转开拍的「魔法动作」等诸多技术的伏笔已经在各处写下，这里有诸多先驱探索又叹息，小厂魔改，沉寂多年的技术穿越了周期迎来合适场景，技术狂想与一代代玩家接力最终产品大成的故事。</p>
+<p><img class="aligncenter size-full wp-image-1668019" src="https://s3.ifanr.com/wp-content/uploads/2026/06/1234.png" alt="" width="1535" height="1024" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/1234.png 1535w, https://s3.ifanr.com/wp-content/uploads/2026/06/1234-360x240.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/1234-768x512.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/1234-1024x683.png 1024w" sizes="(max-width: 1535px) 100vw, 1535px"></p>
+<h3>云台相机，云台在先</h3>
+<p>初代 Osmo Pocket 云台相机发布的时候，人们之所以觉得这样的产品必要性不大，是因为想要实现稳定的视频拍摄效果，手机或者运动相机配上一个几百块的稳定器不就完事儿了，何必再买一个设备？</p>
+<p>在当时甚至后面几年，这种「组合技」就是轻量化视频拍摄的最佳最省解决方案。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/c0e3253b-4ee7-4f00-9893-5a2fe9b36212.png" alt=""></p>
+<div class="editor-image-source">
+<p>飞宇 G3</p>
+</div>
+<p>2013 年，此前一直做无人机飞控和航拍云台的飞宇，决定进行转型，把航拍云台技术用于手持云台，推出了全球首款面向 GoPro 的手持两轴云台飞宇 G3。</p>
+<p>天与地就此连接，飞宇 G3 提供手柄和云台，GoPro 运动相机提供相机和屏幕，它们就有了手柄，云台，相机和屏幕的组合体，成为了如今云台相机最早的雏形，也开启了小型电子云台的时代。</p>
+<p>也许是为了证明自己在云台相机领域的先驱地位，在飞宇的官网里，他们把「一体式云台相机」和「手持运动相机稳定器」一并归入了「云台相机」的大分类里。</p>
+<p>是的，飞宇后面也发布了好几款手持云台相机，也叫 Pocket 系列。甚至飞宇 Pocket3 的发布时间还比大疆 Pocket3 早了几个月。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/bc8e75e4-1172-4633-b11d-4c1aa251dc12.jpg" alt=""></p>
+<div class="editor-image-source">
+<p>大疆灵眸 Osmo 相机</p>
+</div>
+<p>除了飞宇，当时的智云也发布了 GoPro 手持云台，适配市面上几乎所有 Hero 运动相机。两年之后的 2015 年，也在天空丈量大地的大疆发布了灵眸 Osmo 相机，它有手柄，云台和相机，但是没有屏幕，需要外接一部手机作为取景器。灵眸 Osmo 相机在市场上声量不大，但对于大疆的意义非比寻常，在航拍无人机之外，手持影像设备的产品线正式开端，如今已是大疆的另一条营收支柱。</p>
+<p>如果对比 2018 年发布的 Osmo Pocket 云台相机，就会发现它和 3 年前的灵眸 Osmo 相机在影像参数上有诸多相似，比如同样的 1200 万像素 1/2.3” CMOS，同样的 100-3200 视频 ISO 动态范围，同样的 8s – 1/8000s 电子快门速度等等等，区别是 Osmo Pocket 云台相机大大降低了体积和重量，并在视频帧率、码率可以做得更高，为了方便视频拍摄，等效焦距也调整为了 26mm。</p>
+<p>在大疆手持影像设备关键的 2015 年和 2018 年之间，业界对于这类产品的思考也没有停止。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/d9aaccb7-206f-42eb-b74c-b1c538cb1df5.png" alt=""></p>
+<div class="editor-image-source">
+<p>GoPro Karma Grip 手持稳定器</p>
+</div>
+<p>2017 年 3 月，GoPro 推出了自家的稳定器 Karma Grip，作为官配产品，Karma Grip 可以实现 GoPro 运动摄像机的启动 / 停止摄像机，调整拍摄模式，还是用 HiLight 快速标记精彩片段等操作。此外，它也可以实现主体拆分，能通过安装环连接至多种 GoPro 安装支架，可以穿戴在胸前、也可以装在背包的肩带上，也能为 GoPro 充电。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/0ea6d3f4-74d3-4b69-bb5e-4afa2fa5c31e.png" alt=""></p>
+<div class="editor-image-source">
+<p>Removu K1 手持云台相机</p>
+</div>
+<p>同样还是在 2017 年，之前主要给 GoPro 运动相机做配件的韩国品牌 Removu 也许就是从 Karma Grip 的设计中获得了产品灵感，顿觉不该郁郁久居人下，决定用更激进更整体的产品革掉 GoPro 的命，于是推出了 Removu K1 手持云台相机，并上线了众筹平台 indiegogo。</p>
+<p>这个看起来有点像剃须刀的玩意儿真正意义上兼具了手柄，云台（内置三轴稳定器），可旋转相机（可拍摄 4K 30fps 视频，1200 万像素照片），屏幕（1.5 英寸 LCD 屏）的手持云台相机的完全体产品，人们再也不需要拼拼凑凑一套设备来搞组合技了。</p>
+<p>历史之所以没太记住形态上开天辟地的 Removu K1 手持云台相机，还是因为它只是做到了模块的缝合，但它的重量高达 340 克，几乎是大疆初代 Osmo Pocket 云台相机 116 克重量的 3 倍。</p>
+<p><strong>消费电子行业就是这样，人们不会记住第一，只会记得最好。</strong></p>
+<p>AirPods 是蓝牙耳机的发明者吗，是 TWS 耳机的发明者吗？当然不是，在此之前早有 Earin 和 Onkyo W800BT 这样分体式蓝牙耳机存在，但 AirPods 通过预埋 EarPods 的形态设计，低功耗 W1 芯片，还有多传感器感应，Siri 连接等等技术，把产品体验做到了先驱产品难以企及的程度。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/1643f8ab-5c0f-4a51-adcf-0b031a17a60c.jpg" alt=""></p>
+<div class="editor-image-source">
+<p>GoPro 的云台相机专利图</p>
+</div>
+<p>在与大疆还有影石多线竞争的 GoPro 也不是没有想过推出手持云台相机，在 2018 年 1 月，GoPro 提交了一份专利文件：这不仅是一款有手柄云台相机和屏幕的产品，甚至还可以进行拆分，云台和相机部分可以安装在无人机上。</p>
+<p>这也算是一个大胆又合理的想法，毕竟手持云台相机的云台技术就是源于无人机航拍云台落地，GoPro 希望这个技术返航来拯救当时岌岌可危的无人机业务。</p>
+<p>GoPro 的第一款无人机 Karma 是与 HERO5 运动相机还有 Karma Grip 手持稳定器一起发布，HERO5 运动相机可以独立使用，也可以装在 Karma Grip 变成云台相机，还可以装在 Karma 无人机上变成航拍相机，是当时很先进的「生态化反」概念，奈何无人机本身炸机连连，与天空无缘。</p>
+<p>但，让云台相机辗转天地之间的专利设计依旧只是个设计，估计按照 GoPro 最近的情况，怕是永远都没法付诸量产了。</p>
+<p>2020 年，时隔两年，大疆又推出了 Pocket 的第二代产品，相比初代，Pocket2 升级了迷你摇杆、20mm vlog 黄金焦段和全能手柄。虽然没有成为现象级产品，但这三项当时看来很超前的设计，奠定了后来 Pocket3 的爆款。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/26b6dfcb-f52e-4e2f-a611-df9253614430.jpg" alt=""></p>
+<div class="editor-image-source">
+<p>大疆 Osmo Pocket 和 Pocket2</p>
+</div>
+<h3>从百万级市场，到千万级市场</h3>
+<p><strong>如果说一体化云台相机拿到了进入大众市场的入场券，那旋转屏就是它成为爆款的「拿手好戏」。这出戏，其实很早就开始铺垫了。</strong></p>
+<p>飞宇是一家神奇的厂商，他们在 2013 年第一次把无人机云台技术搬上了手持稳定器，他们又在 2022 年申请了「一种可旋转屏幕的手持红外双光云台相机」专利，这是手持云台相机领域较早出现的旋转屏幕概念，横竖屏拍摄的取景模式，也提前锁定了短视频创作的风向。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/54257346-3ac7-41f7-a718-127925650bfd.jpg" alt=""></p>
+<div class="editor-image-source">
+<p>飞宇旋转屏云台相机专利图</p>
+</div>
+<p>就在 2023 年大疆 Pocket 3 发布前的几个星期，一家名叫欧达的深圳厂商推出了欧小影 M3 云台相机，搭配了 3.5 英寸旋转屏幕，可实现横竖屏两种取景模式，这款设备在市面上没什么水花，主要原因还是 1 / 2.5 英寸的传感器跟不上时代需求了。</p>
+<p>更神奇的是，深圳厂商欧达是一家穿越了数个周期的数码影像设备厂商，早在 2010 年的时候，他们就推出了 HDV - VS1 数码摄像机，最大特点就是支持旋转的 3.5 英寸屏幕，以及，「旋转即开机开拍」，「转回即关机收纳」。某种程度上来说，这也是一种技术和产品的传承。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/880eb913-4cc3-4690-b213-6fc9737b519c.jpg" alt=""></p>
+<div class="editor-image-source">
+<p>欧达 HDV - VS1 数码摄像机</p>
+</div>
+<p>之所以说这些，是因为如果非要给大疆 Pocket 3 定义一个 Killer Feature 的话，我觉得就应该是「旋转即开拍」的设定。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/843f764d-ca3e-4a96-b998-60d5faff7bdd.jpg" alt=""></p>
+<div class="editor-image-source">
+<p>欧小影 M3 云台相机，具有横竖两种取景模式</p>
+</div>
+<p>大疆 Pocket 3 用 20 个月的时间卖出了 1000 万台，这也是一个类似于 iPhone 的故事。</p>
+<p>根据雷峰网报道，在 2023 年 10 月 Pocket 3 发布之前，大疆内部的预期是卖个三四十万台，后来发布会反响很好，预期销售量是 100 万台。</p>
+<p>iPhone 初代销量仅有 130 万台，是开天辟地的产品，但市场规模不大，历史断代意义大于市场开拓意义，iPhone 4 则卖出了接近 4000 万台，全新的工业设计和视网膜屏幕才让 iPhone 成为家喻户晓的产品。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/76229f2d-9cb4-40f7-afae-6f4985983eac.png" alt=""></p>
+<div class="editor-image-source">
+<p>大疆 Pocket 3</p>
+</div>
+<p>大疆 Pocket 3 相对于前代的升级更甚于 iPhone 4 相对于前代的升级，1 英寸传感器的加入保证了它有超越多数旗舰影像手机的画质，屏幕加大到 2 英寸让拍摄和操作更加便捷。</p>
+<p>当用户握上手持云台相机的时候，就像西门吹雪握住了长剑，费德勒握上了网球拍， 中华小当家握上了菜刀，一旦这个动作完成了，那人与器物的宿命连接也开始，只需要大拇指轻轻一拨，屏幕旋转 90 度，屏幕亮起，电机转动，镜头进入工作状态，拍摄开始。</p>
+<p>握，拨，这两个自然而然一气呵成的动作在手机上做不出来，这就是在回答那个所有硬件从业者都会被问到的问题：这事儿手机能不能干，如果手机能干，它存在的必要性在哪里？</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/b1826cce-edb7-4705-9b60-dcfcb584b8f2.jpg" alt=""></p>
+<div class="editor-image-source">
+<p>索尼 DSC - M1 数码相机使用方法</p>
+</div>
+<p>不过要追溯手持影像设备使用旋转屏幕，以及旋转即开机或开拍的设定起源，那就得追溯到 2004 年 11 月索尼发布的 DSC - M1 数码相机。在消费电子设备上大量使用机械结构的时代，这款产品支持屏幕的 90 度旋转和 180 度翻转，兼顾了拍摄和自拍场景，并且 LCD 屏幕 90 度旋转即开机，同理合上屏幕即关机。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/1b9e6aba-c84c-4eda-99c7-072fee33c3d0.png" alt=""></p>
+<div class="editor-image-source">
+<p>索尼 DSC - M1 数码相机</p>
+</div>
+<p>在繁星满天的索尼设计黄金年代，DSC - M1 数码相机依旧亮眼，它不落传统数码相机的窠臼，旋转屏设计可以提供超前又舒适的握持操作方式，旋转自动开机后还腾出了更多空间给不同的操作按钮，同时还叠加了当时代表高端奢华质感的黑色金属拉丝工艺，其背后 Cyber-shot 的标识想必也是不少索尼用户的青春回忆。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/58771dfa-74c6-489f-aef2-40d28891dfd6.png" alt=""></p>
+<div class="editor-image-source">
+<p>LG Wing 旋转双屏手机</p>
+</div>
+<p>当然，消费电子爱好者对于旋转屏的认知可能大多数是由 LG 这家曾经在智能手机领域里最爱形态创新的所造就的，近的有 LG Wing 这款旋转双屏手机，在 LG 停止手机业务之后，这款手机也成了不少人低价捡漏的优质「洋垃圾」。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/b32ba313-dcdf-4df7-9188-1941fe8c936f.jpg" alt=""></p>
+<p>更早之前，LG 在 2008 年发布了 LG KD876 旋转屏手机，其后还有类似形态的 LG VX9400，这款手机也出现在了《钢铁侠》电影里，由男主托尼・斯塔克使用。</p>
+<p>这亦是消费电子有意思的地方，技术和产品概念的生命周期比预想的还要长，甚至可以历久弥新。</p>
+<p>旋转屏幕没有拯救 LG 的手机业务，LG Wing 几乎可以算是 LG 发布的最后一款手机，索尼、欧达这些早就使用了旋转屏幕，以及旋转开机开拍概念的品牌，也没有成为手持影像设备的主流品牌。</p>
+<p>当「旋转即开拍」来到大疆 Pocket 3 之后，才能算如鱼得水，成为体系化技术里的点睛一笔，也成为点燃手持云台相机市场的一条引信。</p>
+<p>类似技术等待合适产品的故事还有很多，康宁大猩猩玻璃源于康宁公司在上世纪 60 年代的 Project Muscle 项目，但一直没有找到合适用途一直被搁置，直到 2007 年苹果需要为 iPhone 寻找一块耐磨且坚固的屏幕盖板才被重新启用，最终实现了科技史上值得铭记的一次合作。</p>
+<h3>大疆迎来了第一个真正的对手，后面还有第二个第三个</h3>
+<p>自始至终，消费电子行业都是群雄逐鹿成王败寇的叙事。</p>
+<p>飞宇、GoPro、欧达这些品牌给手持云台相机行业贡献了不少产品构思和实践，但市场上一直没有真正能和大疆在产品综合维度竞争的品牌。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/98025487-d60c-4f6d-b10f-8322d0dbb1a2.png" alt=""></p>
+<div class="editor-image-source">
+<p>影石 Luna Ultra 云台相机</p>
+</div>
+<p>而在 4 月到 6 月时间里，影石 Luna Ultra 和大疆 Pocket 4P 的漫长预热勾起了行业的无限好奇，因为这是大疆在手持云台相机领域迎来的第一个可能打得有来有回的对手。</p>
+<p>谁不想看英雄少年挑战武林霸主的故事呢？</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/7e02b1a5-a1c0-481f-a5a4-e6c8a0ac4517.png" alt=""></p>
+<div class="editor-image-source">
+<p>大疆 Pocket 4P 云台相机</p>
+</div>
+<p>目前已知的信息是，影石 Luna Ultra 和大疆 Pocket 4P 都拥有双摄结构，主摄都是 1 英寸大底，长焦都是 3X，都采用旋转屏幕设计。</p>
+<p>但，相同的招式对轰，最终结果自然是「棍怕老郎」，毕竟云台相机就像个棍一样。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/fab868ad-00d0-419b-b13c-aa30aa1efe8f.jpg" alt=""></p>
+<div class="editor-image-source">
+<p>影石基于 ONE R 模块化相机改造的三段式云台相机试验机</p>
+</div>
+<p>影石也有自己的技术路径和技术积累，2020 年影石发布了 ONE R 模块化多镜头防抖运动相机，支持 4K 广角、5.7K 全景及徕卡 1 英寸镜头组合切换。影石在这个模块化相机的基础上进行了魔改尝试，把全景镜头更换为云台镜头，再加装手柄，主机和屏幕沿用 ONE R 的主机屏幕。</p>
+<p>这是影石内部首次尝试云台相机的尝试，虽然因为当时没能搞定散热问题而没有量产，但「搞出一个好用的云台相机」目标已经确定，并申请了双摄云台相机的专利。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/911c4aa1-a26b-4a22-9268-6ebb1edeb481.jpg" alt=""></p>
+<div class="editor-image-source">
+<p>2020 年 8 月，影石手持云台专利图</p>
+</div>
+<p>虽然 2020 年的初次尝试和 2026 年影石 Luna Ultra 问世中间隔着 6 年时间，但影石对于其中关键技术尝试并未停止，可以这么说，不管是影石 Luna Ultra 也好，还是其他的一些经典产品也好，它们都曾以「分布式」的状态存在。</p>
+<p>就像任天堂 Switch 一样，主机，掌机，体感游戏等等元素都不是新鲜东西，但 Switch 能将过去的产品和技术组合起来，也能分散开去，聚散之间，覆盖了更多的场景和功能，最终回答了一个存在很久的问题：游戏可否跟着人走？</p>
+<p>影石 Luna Ultra 看似考虑的问题是如何和大疆 Pocket 4P 做出差异化，实际上想回答另外一个问题：人和影像工具怎么分工？</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/85d088cf-acef-413a-b44b-556626c50ff8.png" alt=""></p>
+<div class="editor-image-source">
+<p>影石 Link AI 云台网络摄像头</p>
+</div>
+<p>2022 年，影石 Link AI 云台网络摄像头发布，这是成熟的量产的带云台相机的产品，只不过并非手持产品而是线上会议产品，这为 Luna Ultra 积累了云台控制、追踪技术和手势识别算法和功能的技术储备。</p>
+<p>2023 年到 2025 年，影石 Flow 和 Flow 2 系列手机稳定器相继发布，这一系列的产品发布不仅云台软件控制和硬件技术的进一步提升，更在于为「非手持场景」的拍摄场景，积累大量的用户洞察和 Know how。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/f81abaf7-fcfe-4842-b7fd-2846c90623f6.png" alt=""></p>
+<div class="editor-image-source">
+<p>手表原生控制 Flow 2 Pro</p>
+</div>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/f8324da9-2cd0-4d16-93e2-d4847a88e4b8.jpeg" alt=""></p>
+<div class="editor-image-source">
+<p>副屏遥控 Flow 2 Pro</p>
+</div>
+<p>Luna Ultra 的手柄内置三脚架设计，就是源于 Flow 系列的内置三脚架。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/fef7c4c9-63ce-4162-8861-506ad662bf72.jpg" alt=""></p>
+<div class="editor-image-source">
+<p>Flow2 Pro 和 Luna Ultra 的内置三脚架</p>
+</div>
+<p>通过另外的智能手机或者智能手表对 Flow 2 系列手机稳定器进行遥控的功能，加上此前尝试的模块化设计，于是就有了 Luna Ultra 带 20 米图传和带麦克风的分离屏；还有深度追踪、手势识别等功能的不断迭代，都是为了解决云台相机离开了人怎么拍的问题。</p>
+<p>前几天影石 CEO 刘靖康发微博解释了 Luna Ultra 延期上市的原因，是他在去年国庆旅游时内测产品的时候，在拍摄街头表演的场景下发现自己全程盯着相机屏幕，并没有真正在欣赏表演。他意识到「享受当下和记录同等重要」，于是就有了第一人称套件的需求，在这个套件的加持下，镜头会随着用户头动（视线）的方向而动，人眼是记录取景器，也仍是欣赏表演和风景的那双眼。</p>
+<p>抽象一点讲，深度追踪，手势识别和第一人称头追套件这些东西用起来的感觉，其实神似钢铁侠（IronMan）里的机甲和武器系统。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/fa5cd2a7-dbc9-4c59-b10e-62727a41928f.png" alt=""></p>
+<p>本质上，这就是影石 Luna Ultra 和大疆 Pocket 4P 的根本区别所在，也是影石和大疆影像理念的差异所在，大疆充分相信创作者，把影像设备当做创作工具；而影石希望做出具有自主能力的影像设备，也就是他们说的 Cameraman（摄影机器人）。</p>
+<p>比如，为了让云台相机更像一个 Cameraman，一个 Real man，影石选择让双摄横置，使其更像人眼。</p>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/%E4%B9%B1%E4%B8%83%E5%85%AB%E7%B3%9F/1771c8f9-d57e-4b65-aba4-c8d573a2a539.png" alt=""></p>
+<div class="editor-image-source">
+<p>荣耀 Robot Phone</p>
+</div>
+<p>除了影石之外，同在深圳的 OPPO 和 vivo 预计也都会在今年发布自家的手持云台相机，包括小米也可能有价格竞争力的同类产品出现，荣耀推出的 Robot Phone 概念产品实际上也是云台相机的新形态。</p>
+<p>依旧是拿 TWS 耳机来做类比，一旦智能手机厂商选择跟进，很可能意味着这个行业即将迎来爆发性的增长，此前百亿美元级别的市场，在 AirPods 发布之后，增长为数百亿美元，并且 TWS 耳机也从单品类衍生出了半入耳式 TWS，入耳式降噪 TWS，耳夹式开放耳机，耳挂式开放耳机，挂脖式耳机，最近甚至还有开放式滤噪耳机出现，场景划分也有专业运动场景，日常通勤场景，办公场景等等等。</p>
+<p>对于手持云台相机来说，或许不会分得这么细，但以目前的行业发展阶段来说，这可能发展为一个年出货数千万，品类好几种，价位段分得更细更全的行业。</p>
+<p>在 2016 年 AirPods 发布了 10 年之后的 2026 年，华为第一次在国内音频市场的份额超越苹果，登顶第一，但这是可能是大家都能接受的结果，苹果在高端市场不受干扰，少品类中份额高单价，华为则有更多的品类，更广的价格带，最终获得更多的出货量，竞争当然激烈，但绝不是你死我活的零和博弈。华为口碑最好是 FreeClip 系列，苹果则是 AirPods Pro，它们并不构成直接竞争关系，反而完善了用户的耳机场景覆盖。</p>
+<p>这就是增量市场的意义，就像云台相机的市场，不知道会比单纯的手持稳定器大多少一样，众多玩家参与的云台相机市场，也不知道会比现在寥寥数款 SKU 的市场大多少一样。</p>
+<p>毕竟参差多态即为美，万木参天是森林，千万级到数千万级的市场容量跃升，毫无疑问伴随着大量需求的出现和满足，这就是诸多新品的机会，也会是这个行业的机会。</p>
+  <div id="ifanr_profile" style="border:1px solid #ccc;font-size:14px;margin:27px auto;font-family:Arial;">
+    <div style="overflow:hidden"><a target="_blank" href="https://www.ifanr.com/author/owen" style="color:#000;text-decoration:none;"></a>
+
+<pre><code>  &lt;div style="text-align:left;line-height:23px;margin-left:80px"&gt;
+    &lt;div style="padding:10px 10px 10px 0"&gt;
+      &lt;div style="margin:0;font-size: 14px;"&gt;&lt;strong&gt;&lt;a target="_blank" href="https://www.ifanr.com/author/owen" style="color:#000;text-decoration:none;"&gt;刘学文&lt;/a&gt;&lt;/strong&gt;
+      &lt;/div&gt;
+      &lt;div style="font-size: 13px; line-height:20px;"&gt;稳中向好。&lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;div style="text-align:right;border-top:1px dotted #ccc;padding:2px 10px; font-size:12px;"&gt;
+  &lt;div&gt;
+                            &lt;a target="_blank" href="mailto:owenliu@ifanr.com" style="margin-right:14px;text-decoration:none;"&gt;邮箱&lt;/a&gt;
+
+      
+                              &lt;a target="_blank" href="http://weibo.com/u/1731822990" style="margin-right:14px;text-decoration:none;"&gt;新浪微博&lt;/a&gt;
+
+      
+                              &lt;a target="_blank" href="5" style="margin-right:14px;text-decoration:none;"&gt;1&lt;/a&gt;
+
+      
+            &lt;/div&gt;
+&lt;/div&gt;
+</code></pre>
+  </div>
+  <p>#欢迎关注爱范儿官方微信公众号：爱范儿（微信号：ifanr），更多精彩内容第一时间为您奉上。</p></div>]]></content>
+      <categories>
+        <category>数码</category>
+      </categories>
+      <tags>
+        <tag>爱范儿</tag>
+        <tag>产品</tag>
+        <tag>公司</tag>
+        <tag>GoPro</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>早报｜曝苹果 Vision Pro 系列被砍/多地高考将查验智能眼镜/DeepSeek 首轮融资规模约 500 亿元</title>
+    <url>/2026/06/04/%E6%97%A9%E6%8A%A5%EF%BD%9C%E6%9B%9D%E8%8B%B9%E6%9E%9CVision-Pro%E7%B3%BB%E5%88%97%E8%A2%AB%E7%A0%8D%E5%A4%9A%E5%9C%B0%E9%AB%98%E8%80%83%E5%B0%86%E6%9F%A5%E9%AA%8C%E6%99%BA%E8%83%BD%E7%9C%BC%E9%95%9CDeepSeek%E9%A6%96%E8%BD%AE%E8%9E%8D%E8%B5%84%E8%A7%84%E6%A8%A1%E7%BA%A6500%E4%BA%BF%E5%85%83/</url>
+    <content><![CDATA[<blockquote>
+<p>原文链接：<a href="https://www.ifanr.com/1668044?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=">https://www.ifanr.com/1668044?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=</a></p>
+</blockquote>
+<div style="padding: 0 14px; text-align: center;"><img src="https://s3.ifanr.com/images/ep/cover-images/pao_ku_de_xiao_ge_cover.jpg" alt="cover"></div>
+<div style="padding: 0 14px;">
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f576.png" alt="🕶" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">曝苹果智能眼镜砍到仅剩 2 款，Vision Pro 系列出局</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f4b0.png" alt="💰" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">DeepSeek 首轮融资规模约 500 亿元，腾讯、宁德时代将成最大外部投资者</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f4cb.png" alt="📋" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">多地高考将查验智能眼镜</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f916.png" alt="🤖" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">ChatGPT 成为全球最快月活超过 10 亿用户的应用</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f4f1.png" alt="📱" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">豆包回应「收费」，即将推出专业版</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f4c8.png" alt="📈" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">曝火山引擎上调 MaaS 目标至 150 亿元</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;">🦿</p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">荣耀 YOYO 智能体可直接操控微信，华为、小米、OPPO、vivo 同步跟进</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/2601.png" alt="☁" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">全球 NAND 市场一季度增至 460 亿美元</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f3a8.png" alt="🎨" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">苹果公布 2026 Apple 设计大奖得主</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f4bb.png" alt="💻" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">MacBook Neo 一季度狂卖 110 万台</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f697.png" alt="🚗" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">乘联分会：5 月新能源乘用车零售 97.4 万辆</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f310.png" alt="🌐" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">Google 允许网站退出 AI 搜索</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f699.png" alt="🚙" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">日本车企统一放宽轻微零部件瑕疵判定</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f680.png" alt="🚀" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">可灵 AI 据称按 180 亿美元估值融资</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f9e0.png" alt="🧠" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">星尘智能三个月融资超 10 亿元</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f4d6.png" alt="📖" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">知乎一季度经调整净利润同比增 147.2%</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f4a1.png" alt="💡" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">「AI 谄媚」让 CEO「容易患上 AI 精神病」</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f6cd.png" alt="🛍" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">制糖工厂联合理想推出 AI 眼镜充电底座，跨界赋能 AI 硬件</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f3a5.png" alt="🎥" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">影石 Luna Ultra 曝光第一人称头追模块，支持大角度仰拍俯拍</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f50d.png" alt="🔍" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">Kimi Work Beta 版开放体验</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f5a8.png" alt="🖨" class="wp-smiley" style="height: 1em; max-height: 1em;"></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">Gemma 4 12B 正式开源：性能接近 26B 模型，16GB 内存笔记本可本地运行</p>
+</div>
+</div>
+</div>
+<section><img src="https://s3.ifanr.com/images/ep/common-images/xin_wen.png" alt="重磅"></section>
+<h3>曝苹果智能眼镜砍到仅剩 2 款，Vision Pro 系列出局</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/6644f390-30e5-4137-a3c9-e9a1abbd6191.png" alt=""></p>
+<p>天风国际证券分析师郭明錤今日在 X 发帖称，苹果此前规划的 XR 头戴设备与智能眼镜产品路线图已大幅调整，目前仅剩两款智能眼镜产品具有可见度，Apple Vision 系列实际上已被移除。</p>
+<p>郭明錤表示，此次路线大改由苹果下一任 CEO John Ternus 拍板定案，调整方向为砍掉 Vision Pro 系列，将资源转向消费潜力更大的智能眼镜类产品。</p>
+<p>根据最新供应链调查，苹果具有显示功能的 AR / XR 智能眼镜（采用光波导方案）将推迟至 2029 年推出；无显示功能的 AI 眼镜（类似 Ray-Ban Meta 形态）预计仍维持 2027 年发布计划。</p>
+<section><img src="https://s3.ifanr.com/images/ep/common-images/da_gong_si.png" alt="大公司"></section>
+<h3>DeepSeek 首轮融资规模约 500 亿元，腾讯、宁德时代将成最大外部投资者</h3>
+<p>据路透社报道，DeepSeek 计划在首轮融资中募资约 500 亿元，投资方包括腾讯控股、宁德时代、网易和京东等。知情人士透露，此轮融资完成后，DeepSeek 的估值将达到 3500 亿至 4000 亿元人民币。</p>
+<p>在投资构成方面，DeepSeek 创始人梁文锋本人将出资 200 亿元人民币，腾讯拟投入 100 亿元人民币，宁德时代拟投入 50 亿元人民币，两者将成为最大外部投资者。知情人士称，此轮融资的投资方数量预计不超过 10 家。</p>
+<p>DeepSeek 预计将在未来数周内完成本轮融资，但知情人士提示，具体财务细节仍有可能发生变化。</p>
+<h3>多地高考将查验智能眼镜</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/da78e19a-cb9c-4cf1-9b3d-d0dde90560df.png" alt=""></p>
+<p>央视新闻综合教育部与多地考试院提醒称，今年高考入场安检将进一步覆盖智能眼镜。教育部 2 日发布高考预警信息，提醒考生无论何种理由、无论是否使用，携带手机、智能手表、智能眼镜等进入考场即构成作弊。</p>
+<p>截至目前，上海、福建、内蒙古、河北、广东等地教育考试机构均已提醒考生配合眼镜查验。其中，内蒙古和河北明确，平时生活学习中佩戴智能眼镜的考生，需提前准备普通光学眼镜，高考期间不受理以智能眼镜代替光学眼镜参加考试的申请。</p>
+<p>广东省教育考试院此前也提醒，2026 年普通高考将于 6 月 7 日至 9 日举行，考生入场执行两次金属探测仪检测加一次智能安检门检测的「2 + 1」安检模式，手机、无线耳机、智能手表、智能手环、智能眼镜等均不得进入考点封闭区和考场。</p>
+<p>另据《新闻联播》记者从教育部获悉，<strong>2026 年全国高考报名人数为 1290 万人，</strong>将于 6 月 7 日开考。</p>
+<h3>ChatGPT 成为全球最快月活超过 10 亿用户的应用</h3>
+<p>路透社援引市场调研机构 Sensor Tower 数据报道称，上线仅约三年时间，ChatGPT 的全球月活已于 5 月正式突破 10 亿，成为有史以来最快达成这一里程碑的应用程序，超越了 Google 地图、Instagram 和 YouTube 等产品的增长速度。</p>
+<p>与此同时，竞争对手 Anthropic 的 Claude 同样保持强劲增长势头。Sensor Tower 数据显示，截至今年第二季度，Claude 的全球月活跃用户数达到 5600 万，同比增幅约为 640%，远高于 ChatGPT 同期约 62% 的增速。</p>
+<p>不过，在绝对用户规模上，两者仍存在明显差距。</p>
+<h3>豆包回应「收费」，即将推出专业版</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/843c4677-492a-4627-94da-ad4423f72c39.png" alt=""></p>
+<p>豆包昨日发布声明，宣布计划推出面向专业人群的「豆包专业版」，同时明确否认了近期网络上流传的「降低基础功能体验以推动付费」的说法。</p>
+<p>声明显示，豆包专业版将聚焦软件开发、数据分析、专业设计、流程自动化、金融分析、科学研究等专业生产力场景。</p>
+<p>对于普通用户日常使用的搜索问答、写作生图、语音及视频对话等功能，豆包表示将维持现有免费服务，保证用户使用体验和习惯不受影响，并称专业版服务也将在一定额度内免费提供。</p>
+<p>豆包在声明中特别提到，官方观察到近期有大量相同 IP 的营销号集中发布内容完全一致的不实信息，称豆包将通过降低基础功能体验来推动用户购买会员，并附上截图佐证。声明明确表示，该说法「完全不实」。</p>
+<h3>曝火山引擎上调 MaaS 目标至 150 亿元</h3>
+<p>《智能涌现》报道称，字节跳动火山引擎在今年 4 月已将 MaaS 业务全年营收目标上调至 150 亿元，而 2025 年底这一目标还是 100 亿元。接近火山的人士称，火山引擎 Token 日均消耗量目前仍保持月度近 40% 的增速。</p>
+<p>报道称，Seedance 2.0 是火山 MaaS 收入快速抬升的主要来源。多位大厂人士表示，仅 Seedance 2.0 一个模型就可为火山带来单月超过 10 亿元收入，并且仍处于爬升阶段。</p>
+<h3>荣耀 YOYO 智能体可直接操控微信，华为、小米、OPPO、vivo 同步跟进</h3>
+<p>据凤凰网科技报道，荣耀 Magic8 系列、500 系列和 X70 全系列已全面支持微信 A2A 助手能力，荣耀方面称目前约 50% 的荣耀活跃设备已具备该能力。</p>
+<p>腾讯客服方面则披露，微信正在与华为、荣耀、小米、OPPO、vivo 等多家手机厂商合作推出这一功能。</p>
+<p>用户需将 YOYO 智能体更新至 90.10.30.063 及以上版本，同时将微信更新至 8.0.72 及以上版本，即可通过语音指令使用 YOYO 助手向微信好友发送消息、拨打语音或视频电话。</p>
+<p>据悉，该功能基于 A2A（Agent-to-Agent）协作机制，由手机厂商的 AI 智能体向微信发起指令，微信负责具体执行并反馈结果，全程采用双重授权机制，以保障数据安全与隐私合规。</p>
+<p>腾讯客服表示，合作旨在以更自然的方式将微信能力融入用户的日常使用中。</p>
+<h3>全球 NAND 市场一季度增至 460 亿美元</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/76faea33-2ffa-4b34-9a38-b34d60b02ebf.png" alt=""></p>
+<p>市场调研机构 Counterpoint Research 昨日发布博文显示，2026 年第一季度全球 NAND 闪存市场营收达到 460 亿美元，同比增至约 3.5 倍，环比也接近翻倍。AI 基础设施需求推动服务器 eSSD 成为主要增长来源。</p>
+<p>报告称，eSSD 在第一季度已占 NAND 市场总额的 43%，预计年底占比将超过 60%。厂商份额方面，三星以 29% 继续排名第一，海力士位居第二；铠侠、美光、闪迪和长江存储之间差距较小。</p>
+<p>长江存储是本轮增长中变化最明显的厂商。受中国本土厂商需求和供应短缺推动，其营收同比增长接近 445%，市场份额从一年前的 8% 升至 13%。</p>
+<h3>苹果公布 2026 Apple 设计大奖得主</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/7c17083a-7607-4029-8d38-161c6cf8c3fd.png" alt=""></p>
+<p>昨天，苹果正式公布了 2026 年 Apple 设计大奖得主。今年共表彰 12 款杰出 app 与游戏：</p>
+<p><strong>乐趣横生类：</strong></p>
+<p>获奖 App：grug 开发者：Ocho（荷兰）</p>
+<p>获奖游戏：Is This Seat Taken? 开发者：Poti Poti Studio（西班牙）</p>
+<p><strong>多元包容类：</strong></p>
+<p>获奖 App：Guitar Wiz 开发者：Bijoy Thangaraj（印度）</p>
+<p>获奖游戏：Pine Hearts 开发者：Hyper Luminal Games Limited（英国）</p>
+<p><strong>创新思维类：</strong></p>
+<p>获奖 App：NBA: Live Games &amp; Scores 开发者：NBA Media Ventures, LLC（美国）</p>
+<p>获奖游戏：Blue PrinceDeveloper: Dogubomb（美国）</p>
+<p><strong>出色互动类：</strong></p>
+<p>获奖 App：Moonlitt: Moon 月相月历与月亮位置开发者: Flipping Hues Srls（意大利）</p>
+<p>获奖游戏：Sago Mini Jinja’s Garden 开发者：Sago Mini（加拿大）</p>
+<p><strong>社会影响类：</strong></p>
+<p>获奖 App：Primary: News in Depth 开发者：Wood Metal Rocks LLC（美国）</p>
+<p>获奖游戏：Consume Me 开发者: Jenny Jiao Hsia 和 AP Thomson（美国）</p>
+<p><strong>视觉图像类：</strong></p>
+<p>获奖 App：Tide Guide: Charts &amp; Tables 开发者：Developer Digital（美国）获奖游戏：Cyberpunk 2077: Ultimate Edition 开发者：CD Projekt S.A.（波兰）</p>
+<h3>MacBook Neo 一季度狂卖 110 万台</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/a1ef15cf-6d15-46f5-9157-85b62ab5072b.png" alt=""></p>
+<p>据 TechCrunch 报道，MacBook Neo 在首售的数周内实现 110 万台出货量。</p>
+<p>根据市场情报机构 IDC 的数据，MacBook Neo 在 3 月中旬上市后的仅三周时间内，全球出货量即达到 110 万台，其中美国市场出货量占比达 44%，印度市场贡献近 1.8 万台。</p>
+<p>该机型起售价定为 4599 元，国行版本叠加教育优惠和国补之后，甚至起售价能去到 3-3.5K。</p>
+<p>库克之前在 4 月的财报电话会议中证实，消费者对 MacBook Neo 的市场反响远超预期，并导致发售初期面临供应链产能限制。同时他指出，受 Neo 机型的销量驱动，苹果在截至 3 月的财季内创下了 Mac 新用户数量的历史纪录。</p>
+<h3>乘联分会：5 月新能源乘用车零售 97.4 万辆</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/bf7de612-b4cf-44ca-af5e-e61806fdf5a8.png" alt=""></p>
+<p>乘联分会发布数据显示，5 月 1 日至 31 日，全国乘用车新能源市场零售 97.4 万辆，同比下降 5%，较上月同期增长 15%；今年以来累计零售 373.2 万辆，同比下降 14%。</p>
+<p>批发端表现相对更强。同一周期内，全国乘用车厂商新能源批发 136.5 万辆，同比增长 12%，较上月同期增长 11%；今年以来累计批发 531.8 万辆，同比增长 2%。</p>
+<p>渗透率方面，5 月 1 日至 31 日，全国乘用车市场新能源零售渗透率为 63%，厂商新能源批发渗透率为 61.1%。同期纯燃料轻型车生产 53.5 万辆，同比下降 45%；混合动力与插混总体生产 37.9 万辆，同比下降 17%，较上月同期增长 11%。</p>
+<h3>Google 允许网站退出 AI 搜索</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/5197a1f0-7ccf-496d-bcf1-94d5ee97b996.png" alt=""></p>
+<p>据 9to5Google 报道，Google 将在 Search Console 中加入新的 opt-out（退出）控制项，让网站所有者决定其内容是否出现在 AI Mode、AI Overviews，以及 Google Discover 中的 AI Overviews 里。网站选择退出后，仍可继续出现在常规 Google 搜索结果和 Discover 信息流中。</p>
+<p>Google 称，这项设置不会被用作常规搜索排名信号，Gemini 应用也不在本次控制范围内。与此同时，Search Console 还新增生成式 AI 搜索统计，包括 AI 回答中的展示次数、哪些页面出现在 AI 回答里，以及对应国家或地区。</p>
+<p>Google 同时披露，AI Overviews 月活跃用户已超过 25 亿，AI Mode 月用户超过 10 亿。新的控制项和统计数据将先面向英国部分网站所有者测试，再逐步推向全球。</p>
+<h3>日本车企统一放宽轻微零部件瑕疵判定</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/df17c3e2-e743-49e6-8c59-7d22086f2b57.png" alt=""></p>
+<p>据日本经济新闻报道，包括丰田、本田在内的日本汽车制造商和零部件生产商正在制定统一零部件缺陷判定政策。新政策旨在缓解原材料供应紧张下的零部件浪费和质检压力。</p>
+<p>这项统一政策将由日本汽车制造商协会和日本汽车零部件工业协会共同制定。实施后，对不影响整车性能的轻微瑕疵，例如黑点、细小划痕、无害毛刺和毛边，零部件厂商将不再自行判定为不良品并废弃，只要符合国家标准且功能和外观无重大问题，整车厂可以接受。</p>
+<p>以车载电子线束塑胶接插件为例，约 60% 的不良判定来自黑点。统一标准后，日本国内预计每月可减少 1 万个废弃品。丰田已设立专项部门，联合配套厂商按统一标准评审零部件，并定期与其他日系车企及供应商召开联合评审会议。</p>
+<h3>可灵 AI 据称按 180 亿美元估值融资</h3>
+<p>IPO 早知道消息称，快手旗下视频生成业务可灵 AI 正在进行分拆以来的首轮融资，投前估值为 180 亿美元，约合 1220 亿元人民币。这轮融资被描述为可灵 AI 的 Pre-IPO 轮，内部正按 2027 年年初递交港股上市申报材料推进。</p>
+<p>快手 5 月曾公告，董事会正在评估重组可灵 AI 相关资产和业务的方案，其中可能涉及引入外部融资。以 6 月 2 日快手收盘市值约 2124 亿港元计算，可灵 AI 这一投前估值约相当于快手当前市值的 66%。</p>
+<p>快手 2026 财年一季度财报显示，可灵 AI 单季收入超过 6.5 亿元，同比增长超过 300%；今年 3 月，可灵 AI 年化收入运行率接近 5 亿美元，是去年同期的 4 倍。</p>
+<h3>星尘智能三个月融资超 10 亿元</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/40220baf-6546-4494-b767-f811606e0096.png" alt=""></p>
+<p>绳驱 AI 机器人公司星尘智能近日完成 B 轮系列融资，三个月内三轮累计融资额超过 10 亿元，估值已突破百亿元。投资方包括梁溪科创产业二期母基金、扬州龙投芯粒、中博聚力、中科创达、科德教育、某头部上市企业及国科投资等。</p>
+<p>商业化方面，星尘智能同步拿到多个产业场景合作订单，包括与中科创达推进千台级工业及商业服务订单并出海，以及与江都经开区共建亿元级应用创新中心，落地文旅酒店场景。</p>
+<p>星尘智能成立于 2022 年，创始人兼 CEO 来杰曾任腾讯机器人实验室 1 号员工与架构师。</p>
+<h3>知乎一季度经调整净利润同比增 147.2%</h3>
+<p>据 36 氪消息，知乎发布 2026 年第一季度业绩报告。报告显示，公司一季度营收 6.52 亿元，环比增长 1.3%；经调整净利润为 1716 万元，同比增长 147.2%，环比实现扭亏。</p>
+<p>收入结构继续向付费内容和 IP 运营倾斜。知乎一季度付费内容及 IP 运营收入为 4.02 亿元，环比增长 15.8%，在总营收中占比 61.7%；营销服务收入 1.91 亿元，占比 29.4%；其它收入 5780 万元，占比 8.9%。</p>
+<p>截至一季度末，知乎现金及现金等价物、定期存款及短期投资合计 44.9 亿元。</p>
+<h3><img src="https://s.w.org/images/core/emoji/11/72x72/1f4a1.png" alt="💡" class="wp-smiley" style="height: 1em; max-height: 1em;"> 「AI 谄媚」让 CEO「容易患上 AI 精神病」</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/d10f420b-42bb-4b48-93ff-b7bdc8ea30c7.png" alt=""></p>
+<p>据《卫报》报道，AI 谄媚（AI sycophancy）正从产品体验问题演变为社会风险。专栏作者 Arwa Mahdawi 昨日发文指出，AI 行业的集体亢奋正在扭曲部分企业高管的现实判断。</p>
+<p>网络上流传着一句话：「你认识的最蠢的人，此刻正在被 AI 告知『你绝对正确』(You’re absolutely right)。」</p>
+<p>这句调侃精准点出了 AI 谄媚的本质 —— 聊天机器人被刻意设计为持续附和用户、给予正向反馈，以此提升用户黏性。但这种设计也让人更难发现自身判断的漏洞。Box 联合创始人 Aaron Levie 此前在 X 上写道：</p>
+<blockquote><p>CEO 天然容易患上「AI 精神病」。他们处于决策层顶端，离具体执行太远，接触 AI 时往往只看到演示中的顺利路径，根本没有考虑后续还需要十几、二十个步骤才能真正落地。</p></blockquote>
+<p>这种认知偏差的代价已在实际事故中显现。今年 4 月，由 Anthropic Claude 驱动的一个 AI 编程智能体出错，删除了初创公司 PocketOS 的全部生产数据库及备份。创始人 Jeremy Crane 事后表示：</p>
+<blockquote><p>行业把 AI 智能体接入生产基础设施的速度，已经明显快于安全架构的建设速度。</p></blockquote>
+<p>Mahdawi 认为，问题根源在于 AI 被刻意设计为「顺从」，持续附和用户观点以提升黏性，但这也让人更难发现自身判断的漏洞。</p>
+<section><img src="https://s3.ifanr.com/images/ep/common-images/hao_chan_pin.png" alt="新产品"></section>
+<h3>制糖工厂联合理想推出 AI 眼镜充电底座，跨界赋能 AI 硬件</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/7cbf1bcb-bb67-4f72-a597-fa9fd71c8caa.png" alt=""></p>
+<p>制糖工厂近日与理想汽车跨界合作，为理想 AI 眼镜 Livis 专属打造一款充电底座。它是智能眼镜的完美伴侣，随放随充；也是所有 C 口设备的充电管家，来者不拒。是充电器，也是桌面支架；更采用了模块化拼拆设计，灵活随行。目前，底座已在理想商城及京东理想智能眼镜官方旗舰店上线。</p>
+<h3>影石 Luna Ultra 曝光第一人称头追模块，支持大角度仰拍俯拍</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/e7e46b9c-c9c0-4569-b63d-118af54a8ae4.jpg" alt=""></p>
+<p>影石 Insta360 昨日发布 Luna Ultra 全新第一人称视角体验视频，展示了该产品独创的「第一人称头追模块」功能。</p>
+<p>该模块支持一键开启头部方向检测，通过三轴云台追踪与实时头部运动检测的组合，实现相机云台与使用者头部方向的实时同步。</p>
+<p>在硬件形态上，该模块采用耳挂式设计，主打轻量化佩戴体验。交互方面，用户双击模块可让云台快速回中，长按则进行佩戴位置校准，并支持超长续航以满足长时间拍摄需求。</p>
+<h3>Kimi Work Beta 版开放体验</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/2dccd715-f46f-4225-b621-926991e39707.png" alt=""></p>
+<p>昨天，Kimi 宣布，面向知识工作者的本地 AI 智能体 Kimi Work 正式开放 Beta 版测试，支持 macOS 12 及以上的 Apple Silicon Mac，Windows 版即将上线。</p>
+<p>据介绍，Kimi Work 将 Kimi Code 已在工程场景中验证的 AI 智能体能力，迁移至面向普通知识工作者的桌面图形界面，用户无需打开终端或配置环境，通过自然语言描述任务即可驱动系统在本地输出文档、表格、PPT 等工作产物。</p>
+<p>Kimi Work 继承了在线版 Kimi Agent 的建站、PPT 等专业技能（Skill），以及金融、科研、法律等专业数据库，并内置 Kimi WebBridge 方案，支持 AI 直接操作本地浏览器。最高可根据任务复杂度自主创建包含 300 个子 AI 智能体的协作团队。</p>
+<h3>Android 与 AirDrop 互通下放至更多机型</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/a191e3cc-6911-40e1-ab43-a2364df7d8c4.png" alt=""></p>
+<p>据 MacRumors 报道，Google 的 Quick Share 已把与苹果 AirDrop 互通的能力扩展到更多 Android 机型。</p>
+<p>这次新增覆盖三星 Galaxy S25 Edge、Galaxy S24 系列、Galaxy Z Flip7、Z Fold7、Z Flip6、Z Fold6、Z TriFold，荣耀 Magic V6、一加 15，以及 OPPO Find X9 系列、Find N6，vivo X300 系列等机型。Google 自家的 Pixel 10、Pixel 9 和 Pixel 8a 等设备也在支持列表中。</p>
+<p>Google 还计划在未来几个月把这一能力带到 Motorola Razr Fold 2026、OPPO Find X8 系列和荣耀 Magic8 Pro。</p>
+<h3>曝荣耀机器人手机支持 C-Log 和 LUT</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/63163bc6-26eb-480c-a362-ecc29fb01914.png" alt=""></p>
+<p>据博主「旺仔百事通」爆料，荣耀 Robot Phone 将于今年第三季度上市，主打影音创作，支持 AI 自动追踪主体、全自动运镜、预设模板、C-Log、LUTs，以及锁焦、锁白平衡、锁 AE、锁运镜数据等能力。</p>
+<p>爆料还称，这款手机的抗跌落能力已达到旗舰水平，防水能力仍在持续优化。荣耀今年 3 月曾在 MWC 2026 宣布与电影摄影机厂商 ARRI 阿莱达成战略技术合作，并称该合作将率先在 Robot Phone 上落地，目标是把移动影像能力与电影摄影技术结合。</p>
+<h3>千问向第三方 Agent 和 Skill 开放</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/4bae8efa-03d6-40bc-b895-7e3cc935de91.png" alt=""></p>
+<p>阿里千问昨日宣布向第三方 Agent、Skill 全面开放，企业可在千问中运营自己的品牌 Agent，并自定义 Agent 人设与服务边界。首批测试企业包括瑞幸咖啡、肯德基、蜜雪冰城和东方航空，相关服务将陆续上线。</p>
+<p>官方称，企业 Agent 将以对话形式为用户提供产品服务，并具备记忆与主动规划能力。例如，东航 Agent 可根据用户行程计划和旅行偏好推荐出行方案；瑞幸咖啡 Agent 可主动提醒用户中午排队时间较长，建议提前半小时点单。</p>
+<p>这次开放把千问从通用聊天入口推进到品牌服务入口。餐饮、航空和零售品牌可以把下单、行程、权益、复购提醒等服务放进同一个对话框中，千问则承担分发、记忆和任务规划层。</p>
+<h3>Gemma 4 12B 正式开源：性能接近 26B 模型，16GB 内存笔记本可本地运行</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/3b57c218-32b8-434f-9d5e-cdf3d4d5f828.png" alt=""></p>
+<p>Google 正式发布 Gemma 4 12B，定位介于边缘端 E4B 与 26B 混合专家模型（MoE）之间，也是 Gemma 4 系列中首个支持原生音频输入的中等规模模型。</p>
+<p>Gemma 4 12B 的核心设计目标是在消费级硬件上实现多模态推理。官方信息显示，该模型只需 16GB 显存或统一内存即可在笔记本电脑上本地运行，同时在标准评测基准上的表现接近 26B MoE 模型，但总内存占用不到后者的一半。</p>
+<h3>智元开源具身交互数据集</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/5a1f68c5-9abd-4aed-b5a2-ee957df7e3e4.png" alt=""></p>
+<p>智元昨日开源 AGIBOT WORLD 2026 数据集第二期「多样交互（Rich Interaction）」，称其为行业首个聚焦物理交互的开源具身数据集。</p>
+<p>数据集面向世界模型、神经仿真器、物理感知和表征学习等具身智能研究，记录机器人与真实物理世界之间复杂、高密度、非理想的交互过程。</p>
+<p>官方称，本期数据集希望把具身智能数据范式从「学习成功动作」推进到「理解完整的物理分布」。它不仅记录成功动作，也覆盖真实环境中的摩擦、碰撞、遮挡、失误和非标准交互，供研究者训练更接近物理世界规律的模型。</p>
+<p><img src="https://s.w.org/images/core/emoji/11/72x72/1f917.png" alt="🤗" class="wp-smiley" style="height: 1em; max-height: 1em;"> Hugging Face: huggingface.co/datasets/agibot-world/AgiBotWorld2026</p>
+<section><img src="https://s3.ifanr.com/images/ep/common-images/pin_pai.png" alt="新消费"></section>
+<h3>名创优品回应「非会员无法买单」</h3>
+<p>据界面新闻报道，近日多名消费者在社交平台反映，在名创优品门店购物时遭遇「非会员无法结账」要求，部分普通日用品也被要求注册会员。</p>
+<p>对此，名创优品客服回应称，目前只有购买盲盒类产品时需要出示有效会员凭证，潮玩以外的其他产品是否出示会员凭证由消费者个人意愿决定。</p>
+<p>客服同时表示，如果消费者遇到购买非潮玩商品也被要求出示会员凭证的情况，可以在线上反馈。名创优品去年 12 月曾为防止黄牛囤购盲盒推出会员限购规则，客服当时称盲盒、搪胶毛绒公仔仅对名创优品会员开放购买，其他品类商品不受影响。</p>
+<h3>义乌小商品城赴港 IPO</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/78464137-0b7e-4056-baa3-bc9baf300b5f.png" alt=""></p>
+<p>据界面新闻报道，浙江中国小商品城集团股份有限公司已向港交所递交主板上市申请。公司称，赴港上市是其全球化布局的一步，目标是从义乌小商品批发市场运营方转向国际贸易综合服务商。</p>
+<p>招股书披露，2023 年至 2025 年，公司营收分别为 112.81 亿元、154.75 亿元和 197.07 亿元，归母净利润分别为 26.81 亿元、30.78 亿元和 42.16 亿元。</p>
+<p>小商品城目前运营全球规模最大的小商品批发市场，实体市场面积超过 160 万平方米，商户约 8 万家，商品覆盖 26 大类、200 余万种，与 233 个国家和地区存在贸易往来。</p>
+<p>出海方面，截至 2025 年底，「小商品城品牌出海」计划已在全球 36 个国家和地区布局 78 个项目，包括海外分市场、自营及合作海外仓、海外展厅、Yiwu Fair 海外展和海外国家站。</p>
+<section><img src="https://s3.ifanr.com/images/ep/common-images/hao_kan_de.png" alt="好看的"></section>
+<h3>《蜘蛛侠：崭新之日》发布新海报，北美 7 月 31 日上映</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/4e089053-8081-46a2-ad9b-43085c384295.png" alt=""></p>
+<p>漫威与索尼联合出品的超级英雄新片《蜘蛛侠：崭新之日》昨日发布新版海报。海报画面中，主角彼得・帕克独身置于纽约城市背景之下，反派蝎子与惩罚者也同时现身。</p>
+<p>影片定档北美 7 月 31 日上映，中国内地确认引进，待定档。</p>
+<h3>《大鱼海棠》十周年重映定档 6 月 19 日</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/d222abcd-7550-4fe7-af2a-7468eb28be71.png" alt=""></p>
+<p>动画电影《大鱼海棠》官方微博昨日宣布，影片十周年重映定档 6 月 19 日，并将首次上映 IMAX 2D 版本。该片还将在第 28 届上海国际电影节进行 IMAX 独家展映。</p>
+<p>《大鱼海棠》由彼岸天文化、北京光线影业、霍尔果斯彩条屋影业联合出品，梁旋、张春联合执导。影片耗时 12 年制作，2016 年 7 月 8 日在中国内地上映，2020 年曾重映，累计票房 5.75 亿元，目前豆瓣评分为 7.0。</p>
+<p>第一部讲述掌管海棠花生长的少女椿，为报恩复活人类男孩「鲲」的灵魂，使其成长为巨鱼并回归大海，由此引发一连串违背世界规律的灾难。影片第二部先导预告此前也已发布。</p>
+<p>#欢迎关注爱范儿官方微信公众号：爱范儿（微信号：ifanr），更多精彩内容第一时间为您奉上。</p>]]></content>
+      <categories>
+        <category>数码</category>
+      </categories>
+      <tags>
+        <tag>爱范儿</tag>
+        <tag>早报</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>今年最值得升级的生产力工具，可能是一整张 AI 工位</title>
+    <url>/2026/06/04/%E4%BB%8A%E5%B9%B4%E6%9C%80%E5%80%BC%E5%BE%97%E5%8D%87%E7%BA%A7%E7%9A%84%E7%94%9F%E4%BA%A7%E5%8A%9B%E5%B7%A5%E5%85%B7%EF%BC%8C%E5%8F%AF%E8%83%BD%E6%98%AF%E4%B8%80%E6%95%B4%E5%BC%A0-AI-%E5%B7%A5%E4%BD%8D/</url>
+    <content><![CDATA[<blockquote>
+<p>原文链接：<a href="https://www.ifanr.com/1667995?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=">https://www.ifanr.com/1667995?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=</a></p>
+</blockquote>
+<p><img class="alignnone size-full wp-image-1668051" src="https://s3.ifanr.com/wp-content/uploads/2026/06/12-2.png" alt="" width="1332" height="738" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/12-2.png 1332w, https://s3.ifanr.com/wp-content/uploads/2026/06/12-2-360x199.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/12-2-768x426.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/12-2-1024x567.png 1024w" sizes="(max-width: 1332px) 100vw, 1332px"></p>
+<p>AI 工具推荐现在是门显学。</p>
+<p>打开任何一个平台，都有人在告诉你「这 10 个 AI 工具必须收藏」「2026 年最强 AI 工具箱」。标题一个比一个夸张，列表一个比一个长。你点进去、收藏，然后，再也没有打开过。</p>
+<p>我们自己也推过不少工具。但说实话，大部分 AI 产品用一两周就删了。界面太复杂，响应太慢，免费额度用完就吃灰，还有的纯粹是「能做什么」和「我会用它做什么」之间隔了一条河。</p>
+<p>一年下来，真正留在工位上、每天都在用的，就这几个。</p>
+<p>也顺便聊聊，它们是怎么嵌进我们真实工作流的。</p>
+<h3>信息太多的时代，先让 AI 理清关系</h3>
+<blockquote><p>Gemini 深度研究 + Kimi</p></blockquote>
+<p>在所有被 AI 改变的工作环节里，搜索可能是最早被掀翻的。</p>
+<p>过去做一个选题、一份竞品报告、一次行业判断，最耗时间的不是写，而是找。找资料、筛资料、判断资料 A 和资料 B 之间到底是什么关系。传统搜索引擎给你的是一堆链接，你得自己点开、自己读、自己拼图。</p>
+<p>AI 搜索做的事不太一样。它更像在帮你画一张问题地图：这个话题有哪些分支，哪些结论已经比较确定，哪些方向还需要继续挖掘。</p>
+<p><img class="alignnone size-full wp-image-1667996" src="https://s3.ifanr.com/wp-content/uploads/2026/06/1_AgAABrzPVoUjth9GEodCxJo6gcFz-OFZ.png" alt="" width="1450" height="876" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/1_AgAABrzPVoUjth9GEodCxJo6gcFz-OFZ.png 1450w, https://s3.ifanr.com/wp-content/uploads/2026/06/1_AgAABrzPVoUjth9GEodCxJo6gcFz-OFZ-360x217.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/1_AgAABrzPVoUjth9GEodCxJo6gcFz-OFZ-768x464.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/1_AgAABrzPVoUjth9GEodCxJo6gcFz-OFZ-1024x619.png 1024w" sizes="(max-width: 1450px) 100vw, 1450px"></p>
+<p>Gemini 深度研究适合处理开放性问题。</p>
+<p>比如研究一个海外 AI 产品、一条技术路线、一家新公司，它会先把问题拆成几个方向，自动搜资料，最后吐出一份结构化报告。不是说它写的结论都能直接用，但它给的那张地图，能帮你省掉最前面的两三个小时。</p>
+<p><img class="alignnone size-full wp-image-1667997" src="https://s3.ifanr.com/wp-content/uploads/2026/06/2_AgAABrzPVoWNwtJA_31F0atZnpIxOu0E.png" alt="" width="2000" height="1196" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/2_AgAABrzPVoWNwtJA_31F0atZnpIxOu0E.png 2000w, https://s3.ifanr.com/wp-content/uploads/2026/06/2_AgAABrzPVoWNwtJA_31F0atZnpIxOu0E-360x215.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/2_AgAABrzPVoWNwtJA_31F0atZnpIxOu0E-768x459.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/2_AgAABrzPVoWNwtJA_31F0atZnpIxOu0E-1024x612.png 1024w" sizes="(max-width: 2000px) 100vw, 2000px"></p>
+<p>例如，我让 Gemini 深度研究整理 WWDC 2026 的爆料信息。它会先生成一份研究计划，把任务分为研究网站、分析信息、生成报告几个阶段，这些报告的 AI 味比较重，不能指望拿来就能用，但它提供了一套清晰的资料路径，省掉了大量前期资料整理时间。</p>
+<p>日常中文语境里搜资料，我们更多用 Kimi。</p>
+<p><img class="alignnone size-full wp-image-1667998" src="https://s3.ifanr.com/wp-content/uploads/2026/06/3_AgAABrzPVoXCux5NBXFPM4NEQ3ECoKn8.png" alt="" width="1696" height="5998" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/3_AgAABrzPVoXCux5NBXFPM4NEQ3ECoKn8.png 1696w, https://s3.ifanr.com/wp-content/uploads/2026/06/3_AgAABrzPVoXCux5NBXFPM4NEQ3ECoKn8-360x1273.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/3_AgAABrzPVoXCux5NBXFPM4NEQ3ECoKn8-768x2716.png 768w" sizes="(max-width: 1696px) 100vw, 1696px"></p>
+<p>国内公司的公开资料、政策文件、访谈稿、财报、行业研报，扔进去提炼要点、对比差异、整理时间线，基本够用。不过说实话，非付费用户偶尔会遇到算力不足的提示，这是它目前一个绕不开的问题。</p>
+<p><img class="alignnone size-full wp-image-1667999" src="https://s3.ifanr.com/wp-content/uploads/2026/06/4_AgAABrzPVoVtDQx6b9NFhaj0WzTsWYdc.png" alt="" width="1200" height="338" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/4_AgAABrzPVoVtDQx6b9NFhaj0WzTsWYdc.png 1200w, https://s3.ifanr.com/wp-content/uploads/2026/06/4_AgAABrzPVoVtDQx6b9NFhaj0WzTsWYdc-360x101.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/4_AgAABrzPVoVtDQx6b9NFhaj0WzTsWYdc-768x216.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/4_AgAABrzPVoVtDQx6b9NFhaj0WzTsWYdc-1024x288.png 1024w" sizes="(max-width: 1200px) 100vw, 1200px"></p>
+<p>两个搭配着用，大问题找 Gemini，日常中文资料搜 Kimi。搜索这件事，从「自己翻链接」变成「AI 画地图然后你挑路走」，效率差的不是一点半点。</p>
+<h3>你的知识库，正在变成 AI 理解你的入口</h3>
+<blockquote><p>飞书 + Obsidian</p></blockquote>
+<p>搜来的资料、开会的结论、读文章的想法、做项目的经验，这些东西放哪？</p>
+<p>过去说知识管理，第一反应是建文件夹、做分类、写笔记。但 AI 时代这件事的逻辑变了。知识管理不只是把东西存起来，而是给 AI 建一套理解你的系统。让它知道你的写作风格、判断标准、常用模板、在关注什么方向。</p>
+<p>知名 AI 大神 Andrej Karpathy 前段时间聊过怎么构建个人知识系统，方案偏技术派，但思路值得借鉴：协作工具管动态信息，笔记系统管长期沉淀，AI 参与整理、检索和再加工。</p>
+<p><img class="alignnone size-full wp-image-1668000" src="https://s3.ifanr.com/wp-content/uploads/2026/06/5_AgAABrzPVoV8tvwVoCRPQ4MdHluxHAMe.png" alt="" width="1240" height="3128" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/5_AgAABrzPVoV8tvwVoCRPQ4MdHluxHAMe.png 1240w, https://s3.ifanr.com/wp-content/uploads/2026/06/5_AgAABrzPVoV8tvwVoCRPQ4MdHluxHAMe-360x908.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/5_AgAABrzPVoV8tvwVoCRPQ4MdHluxHAMe-768x1937.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/5_AgAABrzPVoV8tvwVoCRPQ4MdHluxHAMe-406x1024.png 406w" sizes="(max-width: 1240px) 100vw, 1240px"></p>
+<p>落到日常，我们用的是一个更轻的组合：飞书 + Obsidian。</p>
+<p><img class="alignnone size-full wp-image-1668001" src="https://s3.ifanr.com/wp-content/uploads/2026/06/6_AgAABrzPVoVEUOVGr41G54ynjx4u6_9l.png" alt="" width="2000" height="1290" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/6_AgAABrzPVoVEUOVGr41G54ynjx4u6_9l.png 2000w, https://s3.ifanr.com/wp-content/uploads/2026/06/6_AgAABrzPVoVEUOVGr41G54ynjx4u6_9l-360x232.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/6_AgAABrzPVoVEUOVGr41G54ynjx4u6_9l-768x495.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/6_AgAABrzPVoVEUOVGr41G54ynjx4u6_9l-1024x660.png 1024w" sizes="(max-width: 2000px) 100vw, 2000px"></p>
+<p>飞书负责每天都在变的东西：会议纪要、项目进度、选题池、需求列表、团队 SOP。Obsidian 负责更长期的沉淀：写作风格、判断标准、工作方法、案例库、阅读笔记、复盘记录。</p>
+<p>串起来的方式是这样的：把个人信息整理成分层的 markdown 文件，接着可以通过 OpenClaw 接入飞书机器人，也可以把 GPT、Claude、DeepSeek、Kimi 统一接进来。之后不管调用哪个模型，它都可以先去知识库里翻对应的规则文件，理解清楚背景再回答。</p>
+<p><img class="alignnone size-full wp-image-1668002" src="https://s3.ifanr.com/wp-content/uploads/2026/06/7_AgAABrzPVoWImBATQzRLSrDFRz_2jum-.png" alt="" width="2000" height="1278" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/7_AgAABrzPVoWImBATQzRLSrDFRz_2jum-.png 2000w, https://s3.ifanr.com/wp-content/uploads/2026/06/7_AgAABrzPVoWImBATQzRLSrDFRz_2jum--360x230.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/7_AgAABrzPVoWImBATQzRLSrDFRz_2jum--768x491.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/7_AgAABrzPVoWImBATQzRLSrDFRz_2jum--1024x654.png 1024w" sizes="(max-width: 2000px) 100vw, 2000px"></p>
+<p>比如让它写视频脚本，它先看你的脚本规则；让它做选题判断，它先看你的内容方向；问它职业规划，它先看你的履历和目标。用得越久，规则文件越完整，AI 对你的理解就越接近真实的你。</p>
+<p>说白了，技术门槛其实没那么高，难的是先花一个下午，把自己的工作方式整理成 AI 能读懂的格式。</p>
+<h3>打工人的会议外挂，终于不只是录音了</h3>
+<blockquote><p>Plaud</p></blockquote>
+<p>对每周开 10 个会议以上的打工人来说，开会本身可能只占一半工作量。另一半是整理纪要、提炼重点、追踪待办、同步给没参会的同事。这后半段，往往比开会还磨人。</p>
+<p>Plaud 是我们这两年推荐次数最多的硬件，也是近几年少有的硬件黑马。它解决的就是会议结束后那 30 分钟的无用功。</p>
+<p><img class="alignnone size-full wp-image-1668003" src="https://s3.ifanr.com/wp-content/uploads/2026/06/8_AgAABrzPVoVKkWrRBfRNUZ_teU9A8XNG.png" alt="" width="1104" height="736" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/8_AgAABrzPVoVKkWrRBfRNUZ_teU9A8XNG.png 1104w, https://s3.ifanr.com/wp-content/uploads/2026/06/8_AgAABrzPVoVKkWrRBfRNUZ_teU9A8XNG-360x240.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/8_AgAABrzPVoVKkWrRBfRNUZ_teU9A8XNG-768x512.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/8_AgAABrzPVoVKkWrRBfRNUZ_teU9A8XNG-1024x683.png 1024w" sizes="(max-width: 1104px) 100vw, 1104px"></p>
+<p>这个小录音设备往桌上一放，会议结束，纪要已经结构化了。客户访谈完立刻把纪要发回去确认，专业且留了书面凭证；重要会议结束把整理好的重点扔给没参会的同事，省掉所有人的同步时间。</p>
+<p>但它最好用的地方，其实不是录音转文字本身，而是支持定制 prompt 模板。</p>
+<p><img class="alignnone size-full wp-image-1668004" src="https://s3.ifanr.com/wp-content/uploads/2026/06/9_AgAABrzPVoVb9-rrDl5DQpfg1dJLtyRz.png" alt="" width="1104" height="736" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/9_AgAABrzPVoVb9-rrDl5DQpfg1dJLtyRz.png 1104w, https://s3.ifanr.com/wp-content/uploads/2026/06/9_AgAABrzPVoVb9-rrDl5DQpfg1dJLtyRz-360x240.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/9_AgAABrzPVoVb9-rrDl5DQpfg1dJLtyRz-768x512.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/9_AgAABrzPVoVb9-rrDl5DQpfg1dJLtyRz-1024x683.png 1024w" sizes="(max-width: 1104px) 100vw, 1104px"></p>
+<p>这里有一个很多人没意识到的技巧：不要用默认的会议模板，而是换成贴合你岗位的提示词，产出价值通常差好几倍。比如销售可以用「按客户痛点排序总结，列出反对意见」，再加一句「额外梳理客户在会议中表现出犹豫或兴奋的三个瞬间，分析潜在顾虑」。同一段录音，换几套 prompt 重新生成，往往能挖出完全不同的观察角度。</p>
+<p>免费得到一份「客户心理学报告」，这件事最妙的地方在于，你不需要学任何新技能，只需要学会怎么把问题问对。</p>
+<h3>先用 AI 做草稿，正在成为视觉表达的新习惯</h3>
+<blockquote><p>GPT-Image-2 + TapNow</p></blockquote>
+<p>内容产出里，视觉一直是最容易卡住的环节。</p>
+<p>文字可以自己写，方案可以自己改。但一到配图、海报、PPT 视觉、短视频素材，很多人还得等设计师排期。需求说不清楚，来回改几轮，灵感早就凉了。</p>
+<p>今年用得最顺手的组合是 GPT-Image-2 + TapNow。GPT-Image-2 的出图质量稳定、风格可控、提示词体系成熟。科技感配图、产品概念图、社媒海报草稿，它都能快速给出一个能拿来讨论的版本。</p>
+<p><img class="alignnone size-full wp-image-1668005" src="https://s3.ifanr.com/wp-content/uploads/2026/06/10_AgAABrzPVoUgla5O3iJPwrw04IOxpf8E.png" alt="" width="2000" height="1364" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/10_AgAABrzPVoUgla5O3iJPwrw04IOxpf8E.png 2000w, https://s3.ifanr.com/wp-content/uploads/2026/06/10_AgAABrzPVoUgla5O3iJPwrw04IOxpf8E-360x246.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/10_AgAABrzPVoUgla5O3iJPwrw04IOxpf8E-768x524.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/10_AgAABrzPVoUgla5O3iJPwrw04IOxpf8E-1024x698.png 1024w" sizes="(max-width: 2000px) 100vw, 2000px"></p>
+<p>注意，是「讨论」的版本，不是终稿。但这一步恰恰最管用，过去很多需求卡在「你说的感觉我不太理解」，现在可以先丢一张 AI 生成的图到群里，所有人对着同一张图说话。</p>
+<p>视频生成环节，我们更多用 TapNow。它支持调用 Seedance 2.0 和可灵 3.0，适合把已经确定的角色、产品、环境素材延展成短视频。日常视觉记录、产品展示、社媒短内容，够用了。</p>
+<p><img class="alignnone size-full wp-image-1668006" src="https://s3.ifanr.com/wp-content/uploads/2026/06/11_AgAABrzPVoWB5RZA-ARO_Lnqb0yCwRB-.png" alt="" width="1158" height="664" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/11_AgAABrzPVoWB5RZA-ARO_Lnqb0yCwRB-.png 1158w, https://s3.ifanr.com/wp-content/uploads/2026/06/11_AgAABrzPVoWB5RZA-ARO_Lnqb0yCwRB--360x206.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/11_AgAABrzPVoWB5RZA-ARO_Lnqb0yCwRB--768x440.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/11_AgAABrzPVoWB5RZA-ARO_Lnqb0yCwRB--1024x587.png 1024w" sizes="(max-width: 1158px) 100vw, 1158px"></p>
+<p>这套组合不只服务设计师和媒体人。</p>
+<p>销售可以出提案配图，产品经理可以出 UI 草图，品牌营销可以生成海报，老师可以出课件配图。它真正的价值在于正式投入设计资源之前，快速把模糊想法变成可见草稿。提前用 AI 确认方向，沟通成本低很多，返工也少很多。</p>
+<h3>Vibe Coding 火了，需求表达成了新技能</h3>
+<blockquote><p>Claude Code、Codex</p></blockquote>
+<p>今年一个很有意思的变化：越来越多不写代码的人开始用 Claude Code、Codex 这类 AI coding agent。</p>
+<p>过去想写一个小工具、改一个网页、做一个自动化脚本，得找程序员。现在把需求说清楚，AI 就能通过自然语言完成相当一部分开发。这也是 Vibe Coding 今年突然火起来的原因。</p>
+<p><img class="alignnone size-full wp-image-1668007" src="https://s3.ifanr.com/wp-content/uploads/2026/06/12_AgAABrzPVoXvBDNLPE9HSpLr6RNLYIy7.png" alt="" width="1360" height="898" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/12_AgAABrzPVoXvBDNLPE9HSpLr6RNLYIy7.png 1360w, https://s3.ifanr.com/wp-content/uploads/2026/06/12_AgAABrzPVoXvBDNLPE9HSpLr6RNLYIy7-360x238.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/12_AgAABrzPVoXvBDNLPE9HSpLr6RNLYIy7-768x507.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/12_AgAABrzPVoXvBDNLPE9HSpLr6RNLYIy7-1024x676.png 1024w" sizes="(max-width: 1360px) 100vw, 1360px"></p>
+<p>它让不会写代码的人也能参与软件生产。不需要先学完整的编程语言，甚至不需要理解每一行代码，只需要知道自己要什么，并且持续把需求描述清楚。</p>
+<p>配合阿里千问语音输入法，口述需求，让 AI 整理成任务说明，一个人就能跑通过去需要产品、设计、工程一起配合的小工具原型。</p>
+<p><img class="alignnone size-full wp-image-1668008" src="https://s3.ifanr.com/wp-content/uploads/2026/06/13_AgAABrzPVoUGOTSTVltPu7K3ky27JvaL.png" alt="" width="2000" height="1138" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/13_AgAABrzPVoUGOTSTVltPu7K3ky27JvaL.png 2000w, https://s3.ifanr.com/wp-content/uploads/2026/06/13_AgAABrzPVoUGOTSTVltPu7K3ky27JvaL-360x205.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/13_AgAABrzPVoUGOTSTVltPu7K3ky27JvaL-768x437.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/13_AgAABrzPVoUGOTSTVltPu7K3ky27JvaL-1024x583.png 1024w" sizes="(max-width: 2000px) 100vw, 2000px"></p>
+<p>生活中也可以用。比如给自己装一个「微信读书 skill」，让它定期分析阅读记录，统计最近关注的主题，推荐下一批书，找认知盲区。</p>
+<p><img class="alignnone size-full wp-image-1668009" src="https://s3.ifanr.com/wp-content/uploads/2026/06/14_AgAABrzPVoUDY96pHoJCm6tcctF9smnQ.png" alt="" width="1438" height="1020" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/14_AgAABrzPVoUDY96pHoJCm6tcctF9smnQ.png 1438w, https://s3.ifanr.com/wp-content/uploads/2026/06/14_AgAABrzPVoUDY96pHoJCm6tcctF9smnQ-360x255.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/14_AgAABrzPVoUDY96pHoJCm6tcctF9smnQ-768x545.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/14_AgAABrzPVoUDY96pHoJCm6tcctF9smnQ-1024x726.png 1024w" sizes="(max-width: 1438px) 100vw, 1438px"></p>
+<p>未来很多人未必会成为程序员，但会越来越像一个小型工程团队：能描述需求，能指挥工具，能验证结果，能把重复工作交给 AI。</p>
+<h3>AI 干活的间隙，我趁机回血</h3>
+<blockquote><p>清闲 OC1 Pro</p></blockquote>
+<p>到这里，五个工具聊完了。</p>
+<p>但有一个东西，今年给我的回报感可能比上面任何一个都强。它不是软件，也没有 AI 功能。它是一把椅子。</p>
+<p>AI 没有把人从工位前解放出去。相反，当我们越来越习惯把长文档、代码、研究、图片、视频都扔给 AI 处理，工作里反而多了很多新的间隙：等 DeepSeek 读完一份文档，等 ChatGPT 重构一个模块，等 Gemini 生成报告，等视频模型吐出第一版素材。</p>
+<p><img class="alignnone size-full wp-image-1668010" src="https://s3.ifanr.com/wp-content/uploads/2026/06/15_AgAABrzPVoWE7ZNXhLhGM70JWhubO4Lx.png" alt="" width="1160" height="768" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/15_AgAABrzPVoWE7ZNXhLhGM70JWhubO4Lx.png 1160w, https://s3.ifanr.com/wp-content/uploads/2026/06/15_AgAABrzPVoWE7ZNXhLhGM70JWhubO4Lx-360x238.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/15_AgAABrzPVoWE7ZNXhLhGM70JWhubO4Lx-768x508.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/15_AgAABrzPVoWE7ZNXhLhGM70JWhubO4Lx-1024x678.png 1024w" sizes="(max-width: 1160px) 100vw, 1160px"></p>
+<p>人的角色在变。不再只是埋头输出，而是在「发出任务、等待结果、判断修改」之间来回切换。这让工位上的短暂休息变得比以前重要得多。等 AI 的几十秒、几分钟，可以继续刷手机、盯进度条，也可以活动腰背、调整坐姿、闭眼歇半分钟，再回到下一轮判断。</p>
+<p><img class="alignnone size-full wp-image-1668011" src="https://s3.ifanr.com/wp-content/uploads/2026/06/16_AgAABrzPVoVhqn0QXp5EWJ88bAU32AgD.png" alt="" width="2420" height="1720" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/16_AgAABrzPVoVhqn0QXp5EWJ88bAU32AgD.png 2420w, https://s3.ifanr.com/wp-content/uploads/2026/06/16_AgAABrzPVoVhqn0QXp5EWJ88bAU32AgD-360x256.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/16_AgAABrzPVoVhqn0QXp5EWJ88bAU32AgD-768x546.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/16_AgAABrzPVoVhqn0QXp5EWJ88bAU32AgD-1024x728.png 1024w" sizes="(max-width: 2420px) 100vw, 2420px"></p>
+<p>我工位上这把清闲 OC1 Pro，是最近在科技圈、创业圈非常火的动态人机工学椅，定价 4299 元，不便宜。但比起我待在椅子上的时间，我和床待在一起的时间是比不过椅子的。</p>
+<p><img class="alignnone size-full wp-image-1668012" src="https://s3.ifanr.com/wp-content/uploads/2026/06/17_AgAABrzPVoXdZ7U1h7RPfZKxIygL4H8V.png" alt="" width="2000" height="1440" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/17_AgAABrzPVoXdZ7U1h7RPfZKxIygL4H8V.png 2000w, https://s3.ifanr.com/wp-content/uploads/2026/06/17_AgAABrzPVoXdZ7U1h7RPfZKxIygL4H8V-360x259.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/17_AgAABrzPVoXdZ7U1h7RPfZKxIygL4H8V-768x553.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/17_AgAABrzPVoXdZ7U1h7RPfZKxIygL4H8V-1024x737.png 1024w" sizes="(max-width: 2000px) 100vw, 2000px"></p>
+<p>颈枕、椅背、坐垫、扶手都能随坐姿变化调整，腰背支撑不是固定在一个位置上。后仰有 5 档，从日常办公到午休都能覆盖，一键脊柱拉伸在连续工作几小时后是实实在在的放松。</p>
+<p><img class="alignnone size-full wp-image-1668013" src="https://s3.ifanr.com/wp-content/uploads/2026/06/18_AgAABrzPVoVgn7epD3JFm7uxJQnVC-T4.png" alt="" width="2000" height="1440" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/18_AgAABrzPVoVgn7epD3JFm7uxJQnVC-T4.png 2000w, https://s3.ifanr.com/wp-content/uploads/2026/06/18_AgAABrzPVoVgn7epD3JFm7uxJQnVC-T4-360x259.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/18_AgAABrzPVoVgn7epD3JFm7uxJQnVC-T4-768x553.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/18_AgAABrzPVoVgn7epD3JFm7uxJQnVC-T4-1024x737.png 1024w" sizes="(max-width: 2000px) 100vw, 2000px"></p>
+<p>Pro 款多了座椅通风，夏天办公室空调不稳的时候体感差距很明显。它不是那种会让你惊呼黑科技的产品。它就是让你坐到下午五点，腰不酸了。</p>
+<p><img class="alignnone size-full wp-image-1668014" src="https://s3.ifanr.com/wp-content/uploads/2026/06/19_AgAABrzPVoUMzVsTtjhIsITwaITX_lZ4.png" alt="" width="2000" height="1440" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/19_AgAABrzPVoUMzVsTtjhIsITwaITX_lZ4.png 2000w, https://s3.ifanr.com/wp-content/uploads/2026/06/19_AgAABrzPVoUMzVsTtjhIsITwaITX_lZ4-360x259.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/19_AgAABrzPVoUMzVsTtjhIsITwaITX_lZ4-768x553.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/19_AgAABrzPVoUMzVsTtjhIsITwaITX_lZ4-1024x737.png 1024w" sizes="(max-width: 2000px) 100vw, 2000px"></p>
+<p>我们过去聊工位升级，聊的是屏幕尺寸、键盘手感、桌面收纳、设备性能。但用了一年 AI 工具之后，我发现工位真正需要升级的，是人和工具的协作关系。</p>
+<p>查资料、建知识库、记会议、出画面、写工具，最后是坐得住。</p>
+<p>AI 时代最容易被高估的是工具，最容易被低估的是人。</p>
+<p><img class="alignnone size-full wp-image-1668015" src="https://s3.ifanr.com/wp-content/uploads/2026/06/20_AgAABrzPVoX542cf3k9AJrgAG_Ey93G1.png" alt="" width="1752" height="1102" srcset="https://s3.ifanr.com/wp-content/uploads/2026/06/20_AgAABrzPVoX542cf3k9AJrgAG_Ey93G1.png 1752w, https://s3.ifanr.com/wp-content/uploads/2026/06/20_AgAABrzPVoX542cf3k9AJrgAG_Ey93G1-360x226.png 360w, https://s3.ifanr.com/wp-content/uploads/2026/06/20_AgAABrzPVoX542cf3k9AJrgAG_Ey93G1-768x483.png 768w, https://s3.ifanr.com/wp-content/uploads/2026/06/20_AgAABrzPVoX542cf3k9AJrgAG_Ey93G1-1024x644.png 1024w" sizes="(max-width: 1752px) 100vw, 1752px"></p>
+<p>过去两年，AI 生产力工具的付费主体正在发生剧烈的变化。早期更多是个人用户和技术爱好者自己付费，现在不少公司开始把会员订阅、APl token、算力额度纳入员工预算。原因并不复杂，只要一类工具能持续改善表达、判断，创作和执行效率，公司就愿意为它买单。</p>
+<p>类似的逻辑也会延伸到办公硬件上。当越来越多人进入 AI-native 的工作状态，坐在电脑前的时间并没有减少，甚至在一些岗位上变得更长。真正影响效率的，也不只是模型能力和软件体验，还有员工长时间工作时的身体状态、专注质量和办公环境。</p>
+<p>一个好的工位，应该让你更快进入工作，也更容易从工作里恢复。它不只是生产力中心，也是一个人和 AI 协作时最基础的身体接口。</p>
+<p>我们的办公桌上会有越来越多智能硬件、Agent、模型入口和自动化流程。但无论 AI 怎么进化，坐在椅子上的人，才是所有工作的起点。</p>
+<p>工具负责记录、整理、生成和执行。人负责判断、表达、沟通和创造。效率提升的意义，不是接更多任务、坐更久时间，而是少被琐碎消耗，把精力留给重要的事。</p>
+<p>照顾好自己，就是 AI 时代最实在的生产力。</p>
+<p>作者：莫崇宇、李超凡</p>
+<p>#欢迎关注爱范儿官方微信公众号：爱范儿（微信号：ifanr），更多精彩内容第一时间为您奉上。</p>]]></content>
+      <categories>
+        <category>数码</category>
+      </categories>
+      <tags>
+        <tag>爱范儿</tag>
+        <tag>AI</tag>
+        <tag>公司</tag>
+        <tag>生产力</tag>
       </tags>
   </entry>
 </search>
