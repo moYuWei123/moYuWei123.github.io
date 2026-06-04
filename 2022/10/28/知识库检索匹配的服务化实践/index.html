@@ -76,10 +76,248 @@
     <blockquote>
 <p>原文链接：<a target="_blank" rel="noopener" href="https://tech.youzan.com/xiang-liang-hua-wen-ben-pi-pei-jian-suo-de-fu-wu-hua-shi-jian/">https://tech.youzan.com/xiang-liang-hua-wen-ben-pi-pei-jian-suo-de-fu-wu-hua-shi-jian/</a></p>
 </blockquote>
-<p>一、背景<br>　　知识库是企业经营过程中的面向客户和内部员工的知识沉淀文档库，里面包含各类教程、问答、案例等，知识库的检索匹配是自然语言处理 (NLP) 中一个重要的基础问题，本质是进行文本语义的相似度计算，也就是语义匹配，我们很多领域的任务都可以抽象为文本匹配检索任务，例如检索引擎、智能客服、知识检索、信息推荐等领域。<br>二、架构流程<br>2.1、整体架构</p>
-<p>2.2、请求链路</p>
-<p>三、算法模型<br>3.1、DSL 改写<br>　　检索优化第一步：DSL 改写，接手前业务方自己已经对检索结果做过优化，调整不同字段的匹配权重，这一方法的已经难以继续优化。从知识运营的角度出发，在用户检索时，将运营认为重要的文档推到前面，由于文档之间互相有链接引用，可以使用 PageRank 算法给每个文档计算重要分 (PR 值)。<br>　　PageRank 的核心思想是，被引用次数越多的文档越重要。算法原理如下，假设只有四个网页 ABCD，以 AB 间的箭头为例，代表可以从 B 网页跳转到 A 网页，对 B 即一次引用（</p>
+<h1 id="">一、背景</h1>
 
+<p><img src="https://tech.youzan.com/content/images/2022/09/image-3.png" alt="知识库检索匹配的服务化实践"></p><p>　　知识库是企业经营过程中的面向客户和内部员工的知识沉淀文档库，里面包含各类教程、问答、案例等，知识库的检索匹配是自然语言处理 (NLP) 中一个重要的基础问题，本质是进行文本语义的相似度计算，也就是语义匹配，我们很多领域的任务都可以抽象为文本匹配检索任务，例如检索引擎、智能客服、知识检索、信息推荐等领域。<br><br>　　知识库检索匹配可以概述为：给定一个 query 和大量候选知识库的文档，从这些文档中找出与用户输入 query 最匹配的 TopK 个文档。</p><p></p>
+<h1 id="">二、架构流程</h1>
+
+<h2 id="21">2.1、整体架构</h2>
+
+<p><img src="https://tech.youzan.com/content/images/2022/09/----.png" alt="知识库检索匹配的服务化实践"></p>
+
+<h2 id="22">2.2、请求链路</h2>
+
+<p><img src="https://tech.youzan.com/content/images/2022/09/-----1.png" alt="知识库检索匹配的服务化实践"></p>
+
+<h1 id="">三、算法模型</h1>
+
+<h2 id="31dsl">3.1、DSL 改写</h2>
+
+<p>　　检索优化第一步：DSL 改写，接手前业务方自己已经对检索结果做过优化，调整不同字段的匹配权重，这一方法的已经难以继续优化。从知识运营的角度出发，在用户检索时，将运营认为重要的文档推到前面，由于文档之间互相有链接引用，可以使用 PageRank 算法给每个文档计算重要分 (PR 值)。<br>
+　　PageRank 的核心思想是，被引用次数越多的文档越重要。算法原理如下，假设只有四个网页 ABCD，以 AB 间的箭头为例，代表可以从 B 网页跳转到 A 网页，对 B 即一次引用（链出），对 A 则一次被引用（链入）。L (B) 表示 B 网页的链出数量，PR (B) 表示 B 网页的 PageRank 分数。
+<img src="https://tech.youzan.com/content/images/2022/10/dsl1.png" alt="知识库检索匹配的服务化实践">
+<img src="https://tech.youzan.com/content/images/2022/10/dsl2.png" alt="知识库检索匹配的服务化实践">
+　　假设所有文档的初始 PR 值是 0.25，这里 L (B)=2，L (C)=1，L (D)=3，计算出 PR (A)=0.458，接下来计算所有其他被引用（有链入）的文档 PR 值，PageRank 是个迭代算法，反复计算以后所有的 PR 值会收敛，那就是最终每个文档的 PR 值，也是用来改写 DSL 的关键信息：<br></p>
+
+<pre><code>new score = old score * log(1+2*PageRank)  
+</code></pre>
+
+<p>　　old score 指原来不同字段加不同权重由 ES 算出来的 BM25 分数，PageRank 缺失值使用 1 代替。</p>
+
+<h2 id="3">3.２、文本召回</h2>
+
+<p>　　文本召回是召回中最常用的一种策略，最常见的方式是通过对 Query 直接进行分词，然后将分词后的关键词到 ES 构建倒排索引，进行 tf-idf 等相似计算匹配索引召回，这种召回方式的优点是实现简单，不需要训练模型、低资源需求、检索速度快，然而它的缺点也很明显，文本是具有语义的、是有语法结构的，文本召回忽略了语句的语法结构，同时也无法解决一词多义和同义词的问题，对 query 进行语义层面相似的召回效果就比较一般，解决这个问题就要用到向量召回。</p>
+
+<h2 id="3">3.３、向量召回</h2>
+
+<p>　　向量召回的思想就是计算搜索词的向量和文档标题 / 相似问的向量的余弦相似度，返回相似度分数最高的 TopK 个文档，计算向量相似度的步骤放在 Milvus 进行，Milvus 作为向量检索库，对计算过程有优化，性能更好。<br>
+　　向量计算模型结构：
+<img src="https://tech.youzan.com/content/images/2022/09/------.png" alt="知识库检索匹配的服务化实践">
+　　文本转向量的算法模型由 embedding、两层 transformer 和 MLP 组成，模型最后会对编码向量做 L2 归一化，采用典型的双塔模式，可以将左塔的搜索词和右塔的文档标题形成独立的子网络，左右塔的结构分离但编码器参数共享，双塔结构天然的可以用于召回，将这个模型部署到小盒子就可以在线计算搜索词的向量，将海量的知识库文档作为右塔离线训练成文本向量后刷入向量检索工具 Milvus。<br>
+　　双塔召回模型的核心思想是将 query / item 嵌入到共享低维空间，然后通过向量距离来度量相关性。<br>
+　　向量召回流程：
+<img src="https://tech.youzan.com/content/images/2022/09/------1-1.png" alt="知识库检索匹配的服务化实践"></p>
+
+<p>　　工程实现部分的 DP 离线任务中实现了计算文档标题和相似问向量并将其导入 Milvus 的功能。由于 Milvus 对 string 类型属性信息存储检索不够友好，所以在 DB 阶段会请求 mysql 库表对召回结果进行扩展，匹配补全相关信息。<br></p>
+
+<h2 id="34">3.4、精排序</h2>
+
+<p>　　经过召回和粗排后，可以理解为将重要相关的文档排在了前面，但是距离用户真正的检索意图还有差距，可以使用用户的检索记录对结果再进行排序。<br>
+　　基于所有场景的用户检索点击数据，有点击行为就认为检索词和文档标题匹配（正样本），其他就认为没有那么匹配（负样本）<br>
+　　训练数据样例：<br>
+<img src="https://tech.youzan.com/content/images/2022/10/------.png" alt="知识库检索匹配的服务化实践">
+　　采用 in_batch 负采样就不需要提前构造负样本，模型的设计如下：
+<img src="https://tech.youzan.com/content/images/2022/10/---1.png" alt="知识库检索匹配的服务化实践">
+　　检索词与正负样本的相似度会进入 InfoNCE（info Noise Contrastive Estimation，噪声对比估计）的函数计算损失，使用这个损失来更新模型参数。这个由很多负样本组成的双塔结构也称为对比学习，核心思想是去拉近相似的样本，推开不相似的样本，目标是要从样本中学习到一个好的语义表示空间。<br>
+　　精排模型与文本转向量的算法原理相同。<br>
+　　InfoNCE 计算公式：（可以理解为带温度超参的 CrossEntropy）<br></p>
+
+<pre><code>L_i=-log(\frac{exp(sim(z_i, z_i^+)/\tau)}{\sum_j{exp(sim(z_i, z_j)/\tau)}})  
+</code></pre>
+
+<p><img src="https://tech.youzan.com/content/images/2022/10/---2.png" alt="知识库检索匹配的服务化实践">
+　　分子是正例对的相似度，分母是正例对 + 所有负例对的相似度，最小化 infoNCE loss，就是最大化正例对的相似度，最小化负例对的相似度。<br>
+　　在计算损失时，label 可以在 batch 内生成，检索词和文档的编码向量经过矩阵乘法可以得到一个相似度方阵，对角位置就是互相匹配的检索词和文档的分数，如果 batch<em>size = 4，那每行对应的 label 就是 [0,1,2,3]。in</em>batch 负采样损失计算示意图：<br>
+<img src="https://tech.youzan.com/content/images/2022/10/---3.png" alt="知识库检索匹配的服务化实践">
+<img src="https://tech.youzan.com/content/images/2022/10/---4.png" alt="知识库检索匹配的服务化实践"></p>
+
+<p>　　模型训练好以后，就得到文本的编码器，输入两个文本，就可以得到一个匹配的分数，将这个模型部署到小盒子，在需要排序时，输入候选的文档标题和检索词，按计算出来的分数从高到低排序，就完成了一次对检索结果的排序。<br></p>
+
+<h2 id="35">3.5、排序优化</h2>
+
+<p>　　上述向量召回介绍的在模型服务中计算两个文本相似度的方法，在只需要对 20 个文档（一页）排序时是没有问题的，但是每个文档还会有若干个相似问，只使用 20 个商品标题没法很好的代表整个文档，如果能使用每个文档的标题和全部相似问，那效果会更稳定一些，但这样的话，每次进入小盒子排序的文档数就不固定了，少则 20，多则几百，上百的 batch_size 走小盒子很容易超时，就算切成小的 batch，也会有一个失败全部失败的情况，而且总体上 rt 也没下降多少。<br>
+　　与向量召回时类似，模型也改为输入只有一个文本，输出这个文本的向量。每个文档的标题和全部相似问向量都与 Query 向量算相似度后计算均值，等价于先计算文档的标题和全部相似问的向量均值，再与 Query 向量计算相似度。基于此，排序任务也可以转换为向量召回任务。<br>
+　　在进入 Milvus 之前，会按照向量召回和 ES 召回的文档 ID 作为过滤条件，一次计算的 RT 就得以保证，可以支持的 QPS 也可以比基于小盒子的版本高：<br>
+<img src="https://tech.youzan.com/content/images/2022/10/----1.png" alt="知识库检索匹配的服务化实践">
+　　此方法可以解决 RT 和 QPS 问题，但是也有局限，只能优化 “每个文档的标题和全部相似问向量都与 Query 向量算相似度后计算均值” 这个均值计算逻辑，其他的比如 “取最大的相似度” 就不能这么做了，而且 Query 与文档的交互太少，只在最后算相似度，可能不如多次交互的模型的效果好。<br></p>
+
+<h1 id="">四、工程实现</h1>
+
+<p>　　当线上接受一条检索请求文本后，先调用在线推理 - 小盒子计算 Query 向量，然后去 Milvus 向量库中和知识库向量进行相似度计算，并返回距离最近的 Top N 个 Item 作为向量召回的结果。<br></p>
+
+<h2 id="41dp">4.1、离线训练（DP 平台）</h2>
+
+<p>　　海量的知识语料库向量化计算在自研 DP 平台离线运行，使得全库文本匹配速度较快：<br>
+  　　1）语料库预处理：包括语料库的文本清洗、文本筛选等预处理逻辑<br>
+  　　2）语料库向量化：利用上述的向量计算模型进行向量化<br>
+  　　3）导入 Milvus 库：将集合部署在 Milvus 集群，依次批量导入更新机器的集合保证线上可用<br></p>
+
+<h2 id="42sunfish">4.2、在线推理（Sunfish 平台）</h2>
+
+<p>　　自研算法平台（Sunfish）对模型训练提供一站式闭环服务，支持分布式训练、GPU / CPU 切换、模型版本管理、一键式运行和部署等功能，其中：<br>
+  　　1）算法工程模块：一键运行训练、任务作业管理、模型输出<br>
+  　　2）模型管理模块：实现训练任务、地址导入、本地上传等多途径模型来源选择<br>
+  　　3）模型部署模块：简单配置、模型格式选择、线上资源配置等便捷署方式<br></p>
+
+<pre><code>{
+    "inputs":[
+        {
+            "name":"INPUT",
+            "shape":[
+                1,
+                1
+            ],
+            "datatype":"BYTES",
+            "data":[
+                "满足条件满减送没有赠品"
+            ]
+        }
+    ],
+    "outputs":[
+        {
+            "name":"OUTPUT"
+        }
+    ]
+}
+</code></pre>
+
+<h2 id="43milvus">4.3、Milvus 向量检索</h2>
+
+<p>　　Milvus 是一款开源的、针对海量特征向量的向量相似性检索 (ANNS，Approximately nearest neighbor search) 引擎，集成了 Faiss、Annoy 等广泛应用的向量索引，成本更低、性能更好、高度灵活、稳定可靠以及高速查询等特点，十亿向量检索仅毫秒响应。<br>
+　　1、Milvus 向量索引列表如下：<br>
+<img src="https://tech.youzan.com/content/images/2022/10/milvus1.png" alt="知识库检索匹配的服务化实践">
+　　简言之，每种索引都有自己的适用场景，如何选择合适的索引可以简单遵循如下原则：<br>
+  　　1）当查询数据规模小，且需要 100％查询召回率时，用 FLAT；<br>
+  　　2）当需要高性能查询，且要求召回率尽可能高时，用 IVF_FLAT；<br>
+  　　3）当需要高性能查询，且磁盘、内存、显存资源有限时，用 IVFSQ8H；<br>
+  　　4）当需要高性能查询，且磁盘、内存资源有限，且只有 CPU 资源时，用 IVFSQ8。<br></p>
+
+<p>　　2、Milvus 目前支持的距离计算方式与数据格式、索引类型之间的兼容关系：
+<img src="https://tech.youzan.com/content/images/2022/10/milvus2-1.png" alt="知识库检索匹配的服务化实践">
+　　选择合适的距离计算方式比较向量间的距离，能很大程度地提高数据分类和聚类性能，主要采用内积 (IP) 的计算方式，内积更适合计算向量的方向。<br>
+　　内积计算两条向量之间的夹角余弦，并返回相应的点积。内积距离的计算公式为：<br>
+<img src="https://tech.youzan.com/content/images/2022/09/--.png" alt="知识库检索匹配的服务化实践">
+　　假设有 A 和 B 两条向量，则 ||A|| 与 ||B|| 分别代表 A 和 B 归一化后的值。cosθ 代表 A 与 B 之间的余弦夹角。<br>
+　　在向量归一化之后，内积与余弦相似度等价。因此 Milvus 并没有单独提供余弦相似度作为向量距离计算方式。<br></p>
+
+<h2 id="44ai">4.4、AI 模型接口服务</h2>
+
+<p>　　算法模型接口服务由 ai-service 和 ai-app 两个服务组成，ai-service 负责调用算法模型在线推理、Milvus 实时向量召回等接入库，ai-app 负责业务逻辑的开发。<br>
+　　1、ai-service 配置示例：<br></p>
+
+<pre><code>{
+    "model_name": "similarity_jira",
+    "model_source_type": "YZ_MODEL",
+    "model_version": 1,
+    "model_invoke_timeout": 3000,
+    "protocol": "kfserving",
+    "infer_type": "triton",
+    "feature_maps": [
+        {
+            "model_feature_key": "INPUT",
+            "data_type": "string",
+            "shape": "(-1,1)",
+            "default_value": "",
+            "feature_source": "PARAMS",
+            "source_key": "jira_text",
+            "is_required": 1
+        }
+    ],
+    "param_mapping": {
+        "jira_text": "&lt;objectList.jira_text&gt;"
+    }
+}
+</code></pre>
+
+<p>　　2、ai-app 接口设计<br>
+　　实现业务逻辑开发测试后，发布上线即可提供前后端调用。<br>
+　　a、Maven 示例:<br></p>
+
+<pre><code>&lt;dependency&gt;  
+  &lt;groupId&gt;com.youzan&lt;/groupId&gt;
+  &lt;artifactId&gt;ai-app-api&lt;/artifactId&gt;
+  &lt;version&gt;1.0.13-RELEASE&lt;/version&gt;
+&lt;/dependency&gt;  
+</code></pre>
+
+<p>　　b、请求示例：<br></p>
+
+<pre><code>invoke com.youzan.ai.app.api.service.jira.Service.retrieve({"fromApp":"test","scene":"similarity_predict","Title":"满足条件没有赠品","Key":"XXX"})  
+</code></pre>
+
+<p>　　c、返回示例：<br></p>
+
+<pre><code>{
+    "code":200,
+    "data":{
+        "Similaritys":[
+            {
+                "createdAt":1648137600000,
+                "score":0.9390,
+                "key":"XXX0123442334",
+                "title":"满足条件没有赠品"
+            },
+            {
+                "createdAt":1636214400000,
+                "score":0.9010,
+                "key":"XXX0123365819",
+                "title":"满足条件没有送赠品"
+            },
+            {
+                "createdAt":1653408000000,
+                "score":0.8735,
+                "key":"XXX0123482446",
+                "title":"订单满足条件没有送赠品"
+            },
+            {
+                "createdAt":1655308800000,
+                "score":0.8312,
+                "key":"XXX0123496337",
+                "title":"订单满足条件但是没有送赠品"
+            },
+            {
+                "createdAt":1659628800000,
+                "score":0.8028,
+                "key":"XXX0123527965",
+                "title":"订单满条件但是赠品没有送"
+            }
+        ]
+    },
+    "success":true,
+    "message":"successful"
+}
+</code></pre>
+
+<h1 id="">五、服务场景</h1>
+
+<h2 id="51">5.1、官网帮助中心</h2>
+
+<p><img src="https://tech.youzan.com/content/images/2022/09/-------1.png" alt="知识库检索匹配的服务化实践"></p>
+
+<h2 id="52">5.2、相似商品推荐</h2>
+
+<p><img src="https://tech.youzan.com/content/images/2022/09/-------2.png" alt="知识库检索匹配的服务化实践"></p>
+
+<h1 id="">六、总结</h1>
+
+<p>　　本文大致介绍了知识库检索匹配的算法和工程服务化实践过程，服务应用的业务场景比较广泛，并对类似场景的接入做了低代码封装和策略配置，便于快速轻量级的服务化落地。在知识库检索匹配服务化实践过程中，后续值得关注以下几点：<br>
+　　1）对于知识库中低频或缺失的新文档或新商品的 Embedding 学习还不够充分，可考虑利用图结算法结构，把更多 query 和其他属性的语义信息聚合，进而提升 query 和知识库文档的语义表征能力；<br>
+　　2）Embedding 的实现算法比较多，可考虑结合业务需要，将词嵌入模型模块内置化；<br>
+　　3）服务的性能和稳定性，确保服务在高准确率和高 QPS 下的响应性能依然是重中之重。</p>
+
+<h1 id="">七、招聘号外</h1>
+
+<p>　　有赞数据中台团队，目前有数据平台研发以及数据开发岗位虚位以待，有需要的同学请关注官网。</p>
   </div>
 
   
