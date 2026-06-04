@@ -155,6 +155,8 @@ body::before {
   text-transform: uppercase;
   cursor: pointer;
   padding: 3px 0;
+  line-height: 1.75;
+  display: inline;
   transition: color var(--transition);
 }
 
