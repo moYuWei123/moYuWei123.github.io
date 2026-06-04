@@ -328,111 +328,69 @@ body::before {
 }
 
 .news-item {
-  background: var(--card-bg);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius);
-  padding: 30px 32px;
-  margin-bottom: 16px;
-  position: relative;
-  transition: all var(--transition);
-  box-shadow: var(--shadow);
+  padding: 28px 0;
+  border-bottom: 1px solid var(--border-light);
   animation: cardIn 0.5s ease both;
 }
 
-.news-item:nth-child(1) { animation-delay: 0.05s; }
-.news-item:nth-child(2) { animation-delay: 0.1s; }
-.news-item:nth-child(3) { animation-delay: 0.15s; }
-.news-item:nth-child(4) { animation-delay: 0.2s; }
-.news-item:nth-child(5) { animation-delay: 0.25s; }
-.news-item:nth-child(6) { animation-delay: 0.3s; }
-.news-item:nth-child(7) { animation-delay: 0.35s; }
-.news-item:nth-child(8) { animation-delay: 0.4s; }
-.news-item:nth-child(9) { animation-delay: 0.45s; }
-.news-item:nth-child(10) { animation-delay: 0.5s; }
+.news-item:first-child { border-top: 1px solid var(--border-light); }
 
-/* Accent bar on left side of each card */
-.news-item::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 20px;
-  bottom: 20px;
-  width: 3px;
-  background: var(--border);
-  border-radius: 0 2px 2px 0;
-  transition: background var(--transition), width var(--transition);
-}
-
-.news-item:hover {
-  box-shadow: var(--shadow-hover);
-  border-color: #ddd8cf;
-  transform: translateX(2px);
-}
-
-.news-item:hover::before {
-  background: var(--vermillion);
-  width: 3px;
-}
+.news-item:nth-child(1) { animation-delay: 0.03s; }
+.news-item:nth-child(2) { animation-delay: 0.06s; }
+.news-item:nth-child(3) { animation-delay: 0.09s; }
+.news-item:nth-child(4) { animation-delay: 0.12s; }
+.news-item:nth-child(5) { animation-delay: 0.15s; }
+.news-item:nth-child(6) { animation-delay: 0.18s; }
+.news-item:nth-child(7) { animation-delay: 0.21s; }
+.news-item:nth-child(8) { animation-delay: 0.24s; }
+.news-item:nth-child(9) { animation-delay: 0.27s; }
+.news-item:nth-child(10) { animation-delay: 0.30s; }
 
 @keyframes cardIn {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .news-title {
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 700;
-  line-height: 1.5;
-  margin-bottom: 10px;
-  letter-spacing: 0.3px;
+  line-height: 1.55;
+  margin-bottom: 6px;
+  letter-spacing: 0.2px;
 }
 
 .news-title a {
   color: var(--ink);
   text-decoration: none;
   transition: color var(--transition);
-  background: linear-gradient(to right, var(--vermillion), var(--vermillion));
-  background-size: 0 1px;
-  background-position: 0 100%;
-  background-repeat: no-repeat;
-  padding-bottom: 2px;
-  transition: background-size 0.3s ease, color var(--transition);
 }
 
 .news-title a:hover {
   color: var(--vermillion);
-  background-size: 100% 1px;
 }
 
 .news-meta {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   align-items: center;
   flex-wrap: wrap;
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--ink-faint);
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   font-family: "DM Mono", "SF Mono", "Menlo", monospace;
   letter-spacing: 0.5px;
 }
 
 .news-source {
-  color: var(--sage);
+  color: var(--ink-muted);
   font-weight: 500;
   font-size: 11px;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
+  letter-spacing: 0.6px;
 }
 
 .news-meta > span:not(:last-child)::after {
   content: '·';
-  margin-left: 14px;
+  margin-left: 12px;
   color: var(--border);
 }
 
@@ -468,7 +426,7 @@ body::before {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 16px;
+  margin-top: 14px;
   font-family: "DM Mono", "SF Mono", "Menlo", monospace;
   font-size: 11px;
   font-weight: 500;
@@ -476,7 +434,7 @@ body::before {
   text-transform: uppercase;
   color: var(--ink-faint);
   text-decoration: none;
-  transition: all var(--transition);
+  transition: color var(--transition);
 }
 
 .news-readmore::after {
@@ -1870,7 +1828,7 @@ body::before {
   .post-content { font-size: 15px; }
 
   .news-title { font-size: 17px; }
-  .news-item { padding: 22px 20px; }
+  .news-item { padding: 22px 0; }
 
   .archive-item { flex-wrap: wrap; gap: 4px 12px; }
   .archive-date { min-width: auto; }
