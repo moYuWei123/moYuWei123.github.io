@@ -36,4 +36,23 @@
       <% }) %>
     </div>
   <% } %>
+
+  <nav class="post-nav">
+    <% if (page.prev) { %>
+      <a class="post-nav-prev" href="<%= url_for(page.prev.path) %>">
+        <span class="post-nav-label">← 上一篇</span>
+        <span class="post-nav-title"><%= page.prev.title %></span>
+      </a>
+    <% } else { %>
+      <span class="post-nav-prev"></span>
+    <% } %>
+    <% if (page.next) { %>
+      <a class="post-nav-next" href="<%= url_for(page.next.path) %>">
+        <span class="post-nav-label">下一篇 →</span>
+        <span class="post-nav-title"><%= page.next.title %></span>
+      </a>
+    <% } else { %>
+      <span class="post-nav-next"></span>
+    <% } %>
+  </nav>
 </article>

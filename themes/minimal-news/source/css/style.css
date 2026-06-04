@@ -18,7 +18,7 @@
   --shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03);
   --shadow-hover: 0 1px 3px rgba(0,0,0,0.05), 0 8px 24px rgba(0,0,0,0.05);
   --radius: 4px;
-  --max-width: 680px;
+  --max-width: 700px;
   --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -70,7 +70,7 @@ body::before {
 .site-header {
   background: var(--paper);
   border-bottom: 1px solid var(--border);
-  padding: 48px 0 28px;
+  padding: 56px 0 24px;
   text-align: center;
 }
 
@@ -92,16 +92,16 @@ body::before {
 .tagline {
   color: var(--ink-muted);
   font-size: 13px;
-  margin-top: 6px;
+  margin-top: 8px;
   font-weight: 400;
   letter-spacing: 1.5px;
   text-transform: uppercase;
 }
 
 .nav {
-  margin-top: 22px;
+  margin-top: 28px;
   display: flex;
-  gap: 32px;
+  gap: 36px;
   justify-content: center;
 }
 
@@ -669,6 +669,53 @@ body::before {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+/* Post Navigation */
+.post-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  margin-top: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--border-light);
+}
+
+.post-nav-prev,
+.post-nav-next {
+  text-decoration: none;
+  transition: opacity var(--transition);
+}
+
+.post-nav-prev:hover,
+.post-nav-next:hover {
+  opacity: 0.6;
+}
+
+.post-nav-next {
+  text-align: right;
+}
+
+.post-nav-label {
+  display: block;
+  font-family: "DM Mono", "SF Mono", "Menlo", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 6px;
+}
+
+.post-nav-title {
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .tag {
