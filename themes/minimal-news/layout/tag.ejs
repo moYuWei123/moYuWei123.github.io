@@ -1,0 +1,29 @@
+<div class="tag-list">
+  <h1 class="page-title">标签：<%= page.tag %></h1>
+  <% page.posts.each(function(post) {
+      if (page.tag !== '壁纸') {
+        var isWallpaper = false;
+        if (post.tags) post.tags.forEach(function(t) { if (t.name === '壁纸') isWallpaper = true; });
+        if (isWallpaper) return;
+      }
+    %>
+    <article class="news-item">
+      <h2 class="news-title">
+        <a href="<%= url_for(post.path) %>"><%= post.title %></a>
+      </h2>
+      <div class="news-meta">
+        <span class="news-source"><%= post.source_name || '' %></span>
+        <span class="news-date"><%= date(post.date, 'YYYY-MM-DD HH:mm') %></span>
+      </div>
+    </article>
+  <% }) %>
+</div>
+
+<% if (page.total > 1) { %>
+<nav class="pagination">
+  <%- paginator({
+    prev_text: '« 上一页',
+    next_text: '下一页 »'
+  }) %>
+</nav>
+<% } %>

@@ -1,0 +1,44 @@
+{
+  "name": "hexo-site",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "hexo generate",
+    "clean": "hexo clean",
+    "deploy": "hexo deploy",
+    "server": "hexo server",
+    "fetch": "node fetch-news.js",
+    "fetch-wallpapers": "node fetch-wallpapers.js"
+  },
+  "hexo": {
+    "version": "8.1.2"
+  },
+  "dependencies": {
+    "axios": "^1.17.0",
+    "cheerio": "^1.2.0",
+    "hexo": "^8.0.0",
+    "hexo-deployer-git": "^4.0.0",
+    "hexo-filter-mathjax": "^0.9.1",
+    "hexo-generator-archive": "^2.0.0",
+    "hexo-generator-category": "^2.0.0",
+    "hexo-generator-feed": "^4.0.0",
+    "hexo-generator-index": "^4.0.0",
+    "hexo-generator-searchdb": "^1.5.0",
+    "hexo-generator-tag": "^2.0.0",
+    "hexo-next-artalk": "^0.1.3",
+    "hexo-next-giscus": "^1.3.0",
+    "hexo-next-twikoo": "^1.0.3",
+    "hexo-next-valine": "^1.0.0",
+    "hexo-pangu": "^0.4.1",
+    "hexo-renderer-ejs": "^2.0.0",
+    "hexo-renderer-marked": "^7.0.0",
+    "hexo-renderer-stylus": "^3.0.1",
+    "hexo-server": "^3.0.0",
+    "hexo-theme-butterfly": "^5.5.4",
+    "hexo-theme-landscape": "^1.0.0",
+    "hexo-theme-matery": "^2.0.1",
+    "hexo-theme-solitude": "^3.0.21",
+    "hexo-word-counter": "^0.2.2",
+    "rss-parser": "^3.13.0"
+  }
+}

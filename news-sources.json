@@ -1,0 +1,41 @@
+{
+  "sources": [
+    {
+      "name": "Hacker News",
+      "type": "rss",
+      "url": "https://hnrss.org/frontpage?count=8",
+      "category": "科技"
+    },
+    {
+      "name": "Solidot",
+      "type": "rss",
+      "url": "https://www.solidot.org/index.rss",
+      "category": "科技"
+    },
+    {
+      "name": "少数派",
+      "type": "rss",
+      "url": "https://sspai.com/feed",
+      "category": "数码"
+    },
+    {
+      "name": "爱范儿",
+      "type": "rss",
+      "url": "https://www.ifanr.com/feed",
+      "category": "数码"
+    },
+    {
+      "name": "36氪",
+      "type": "rss",
+      "url": "https://36kr.com/feed",
+      "category": "科技"
+    },
+    {
+      "name": "阮一峰",
+      "type": "rss",
+      "url": "https://feeds.feedburner.com/ruanyifeng",
+      "category": "科技"
+    }
+  ],
+  "maxPerSource": 5
+}

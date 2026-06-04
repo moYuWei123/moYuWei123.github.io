@@ -1,0 +1,23 @@
+title: 新闻聚合
+subtitle: 科技资讯 | 每日精选
+description: 聚合国内外科技新闻
+keywords: 科技,新闻,编程,AI,开源
+author: moyuwei
+language: zh-CN
+
+menu:
+  首页: /
+  归档: /archives
+  壁纸: /wallpapers
+  工具: /tools
+
+nav:
+  show: true
+
+index:
+  per_page: 15
+  order_by: -date
+
+footer:
+  since: 2026
+  powered: false

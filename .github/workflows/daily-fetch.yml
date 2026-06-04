@@ -1,0 +1,45 @@
+name: Daily Fetch & Deploy
+
+on:
+  schedule:
+    # Every day at 8:00 Beijing time (UTC+8)
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  fetch-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install
+
+      - name: Fetch news and wallpapers
+        run: |
+          node fetch-news.js
+          node fetch-wallpapers.js
+
+      - name: Commit new posts
+        run: |
+          git config user.name 'github-actions'
+          git config user.email 'actions@github.com'
+          git add source/_posts/
+          git diff --staged --quiet || git commit -m 'Auto fetch: new posts'
+          git push
+
+      - name: Build
+        run: npx hexo generate
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          publish_branch: master
+          force_orphan: true

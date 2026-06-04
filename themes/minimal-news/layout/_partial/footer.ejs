@@ -1,0 +1,9 @@
+<footer class="site-footer">
+  <div class="footer-inner">
+    <p class="footer-copy">&copy; <%= theme.footer.since %> &mdash; <%= date(new Date(), 'YYYY') %> <%= config.title %></p>
+    <p class="footer-links">
+      <a href="<%= url_for('/atom.xml') %>">RSS</a>
+      <a href="<%= url_for('/about') %>">关于</a>
+    </p>
+  </div>
+</footer>

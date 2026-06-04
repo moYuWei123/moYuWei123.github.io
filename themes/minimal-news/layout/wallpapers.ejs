@@ -1,0 +1,75 @@
+<%
+var wallpaperPosts = [];
+site.posts.forEach(function(post) {
+  var tagNames = [];
+  if (post.tags) {
+    post.tags.forEach(function(tag) {
+      tagNames.push(tag.name);
+      if (tag.name === '壁纸') wallpaperPosts.push(post);
+    });
+  }
+});
+%>
+
+<div class="wallpapers-page">
+  <h1 class="page-title">壁纸</h1>
+  <p class="page-subtitle">高清壁纸精选，点击预览大图，右键或点击下载按钮保存</p>
+
+  <% if (!wallpaperPosts || wallpaperPosts.length === 0) { %>
+    <div class="wallpapers-empty">
+      <p>暂无壁纸内容</p>
+    </div>
+  <% } %>
+
+  <div class="wallpaper-grid">
+    <% wallpaperPosts.forEach(function(post) { %>
+      <%
+        // Extract images from post content
+        var images = [];
+        var imgRegex = /<img[^>]+src="([^"]+)"/g;
+        var match;
+        var content = post.content;
+        while ((match = imgRegex.exec(content)) !== null) {
+          images.push(match[1]);
+        }
+      %>
+
+      <% images.forEach(function(img, i) { %>
+        <div class="wallpaper-card"
+             data-src="<%= img %>"
+             data-title="<%= post.title %>"
+             data-post="<%= url_for(post.path) %>"
+             data-index="<%= i %>">
+          <div class="wallpaper-img-wrap">
+            <img src="<%= img %>" alt="<%= post.title %>" loading="lazy">
+            <div class="wallpaper-overlay">
+              <div class="wallpaper-overlay-inner">
+                <span class="wallpaper-cat"><%= post.categories.first() ? post.categories.first().name : '' %></span>
+                <span class="wallpaper-name"><%= post.title %></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    <% }); %>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox">
+  <div class="lightbox-bg" id="lightboxBg"></div>
+  <button class="lightbox-close" id="lightboxClose">&times;</button>
+  <button class="lightbox-prev" id="lightboxPrev">‹</button>
+  <button class="lightbox-next" id="lightboxNext">›</button>
+  <div class="lightbox-content">
+    <img id="lightboxImg" src="" alt="">
+    <div class="lightbox-info">
+      <span id="lightboxTitle"></span>
+      <div class="lightbox-actions">
+        <a id="lightboxDownload" class="btn-primary" download>下载原图</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="<%= url_for('/js/wallpapers.js') %>"></script>

@@ -1,0 +1,66 @@
+<div class="news-list">
+  <% var counter = 0; %>
+  <%
+    // Collect all categories from posts for filter bar
+    var catSet = new Set();
+    page.posts.each(function(post) {
+      var isWallpaper = false;
+      if (post.tags) post.tags.forEach(function(t) { if (t.name === '壁纸') isWallpaper = true; });
+      if (isWallpaper) return;
+      if (post.categories && post.categories.length) {
+        post.categories.forEach(function(c) { catSet.add(c.name); });
+      }
+    });
+    var cats = Array.from(catSet);
+  %>
+  <% if (cats.length > 1) { %>
+  <div class="news-filter">
+    <button class="filter-btn active" data-filter="all">全部</button>
+    <% cats.forEach(function(c) { %>
+    <button class="filter-btn" data-filter="<%= c %>"><%= c %></button>
+    <% }); %>
+  </div>
+  <% } %>
+  <% page.posts.each(function(post) { %>
+    <%
+      var skip = false;
+      if (post.tags) post.tags.forEach(function(t) { if (t.name === '壁纸') skip = true; });
+      if (skip) return;
+    %>
+    <% counter++; %>
+    <%
+      var postCats = [];
+      if (post.categories) post.categories.forEach(function(c) { postCats.push(c.name); });
+    %>
+    <article class="news-item" data-categories="<%= postCats.join(',') %>">
+      <h2 class="news-title">
+        <a href="<%= url_for(post.path) %>"><%= post.title %></a>
+      </h2>
+      <div class="news-meta">
+        <span class="news-source"><%= post.source_name || '' %></span>
+        <span class="news-date"><%= date(post.date, 'YYYY-MM-DD') %></span>
+        <% if (post.categories && post.categories.length) { %>
+          <span class="news-category">
+            <% post.categories.forEach(function(cat) { %>
+              <a href="<%= url_for(cat.path) %>"><%= cat.name %></a>
+            <% }) %>
+          </span>
+        <% } %>
+      </div>
+      <div class="news-summary">
+        <%- post.excerpt || post.content.substring(0, 300) + '...' %>
+      </div>
+      <a class="news-readmore" href="<%= url_for(post.path) %>">阅读全文</a>
+    </article>
+  <% }) %>
+</div>
+
+<% if (page.total > 1) { %>
+<nav class="pagination">
+  <%- paginator({
+    prev_text: '← Prev',
+    next_text: 'Next →',
+    space: '&nbsp;'
+  }) %>
+</nav>
+<% } %>

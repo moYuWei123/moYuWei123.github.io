@@ -1,0 +1,12 @@
+<header class="site-header">
+  <div class="header-inner">
+    <a class="logo" href="<%= url_for('/') %>"><%= config.title %></a>
+    <p class="tagline"><%= config.subtitle %></p>
+    <nav class="nav">
+      <% for (const [name, link] of Object.entries(theme.menu || {})) { %>
+        <a href="<%= url_for(link) %>"><%= name %></a>
+      <% } %>
+      <button class="nav-search" id="navSearch" aria-label="搜索">搜索</button>
+    </nav>
+  </div>
+</header>

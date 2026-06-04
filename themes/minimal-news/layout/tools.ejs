@@ -1,0 +1,135 @@
+<div class="tools-page">
+  <h1 class="page-title">工具</h1>
+
+  <div class="tools-tabs">
+    <button class="tools-tab active" data-tab="img-compress">图片压缩</button>
+    <button class="tools-tab" data-tab="html-pdf">HTML 转 PDF</button>
+    <button class="tools-tab" data-tab="video-bgm">视频提取BGM</button>
+  </div>
+
+  <!-- Image Compression Tool -->
+  <section class="tools-panel active" id="panel-img-compress">
+    <div class="tool-dropzone" id="dropzone">
+      <div class="dropzone-content">
+        <span class="dropzone-icon">拖拽图片到此处</span>
+        <span class="dropzone-or">或</span>
+        <input type="file" id="imgInput" accept="image/*" multiple hidden>
+        <button class="dropzone-btn" id="selectBtn">选择文件</button>
+      </div>
+    </div>
+
+    <div class="compress-controls" id="compressControls" style="display:none">
+      <div class="control-row">
+        <label>压缩质量</label>
+        <div class="quality-slider">
+          <input type="range" id="qualitySlider" min="10" max="100" value="80">
+          <span id="qualityValue">80%</span>
+        </div>
+      </div>
+      <div class="control-row">
+        <label>最大宽度</label>
+        <input type="number" id="maxWidth" value="1920" min="100" max="8000"> px
+      </div>
+      <button class="btn-primary" id="compressAll">压缩全部</button>
+    </div>
+
+    <div class="compress-results" id="compressResults"></div>
+  </section>
+
+  <!-- HTML to PDF Tool -->
+  <section class="tools-panel" id="panel-html-pdf">
+    <div class="pdf-toolbar">
+      <div class="toolbar-group">
+        <label>页面尺寸</label>
+        <select id="pageSize">
+          <option value="a4">A4</option>
+          <option value="letter">Letter</option>
+          <option value="legal">Legal</option>
+        </select>
+      </div>
+      <div class="toolbar-group">
+        <label>方向</label>
+        <div class="toggle-group">
+          <button class="toggle-btn active" data-orient="portrait">纵向</button>
+          <button class="toggle-btn" data-orient="landscape">横向</button>
+        </div>
+      </div>
+      <div class="toolbar-group">
+        <span class="toolbar-hint">点击「导出」后，在打印对话框中选择「另存为 PDF」</span>
+      </div>
+      <button class="btn-primary" id="exportPdf">导出 PDF</button>
+    </div>
+
+    <div class="html-pdf-layout">
+      <div class="html-input">
+        <div class="input-header">
+          <label>HTML 源码</label>
+          <button class="clear-btn" id="clearHtml">清空</button>
+        </div>
+        <textarea id="htmlInput" placeholder="在此粘贴 HTML 代码…" spellcheck="false"></textarea>
+      </div>
+      <div class="html-preview">
+        <div class="preview-header">
+          <span>预览</span>
+        </div>
+        <div class="preview-paper" id="previewPaper">
+          <iframe id="previewFrame" sandbox="allow-scripts allow-modals allow-same-origin"></iframe>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Video BGM Extraction Tool -->
+  <section class="tools-panel" id="panel-video-bgm">
+    <div class="tool-dropzone" id="videoDropzone">
+      <div class="dropzone-content">
+        <span class="dropzone-icon">拖拽视频到此处</span>
+        <span class="dropzone-or">或</span>
+        <input type="file" id="videoInput" accept="video/*" hidden>
+        <button class="dropzone-btn" id="videoSelectBtn">选择视频</button>
+      </div>
+    </div>
+
+    <div class="video-preview" id="videoPreview" style="display:none">
+      <div class="video-info-card">
+        <div class="video-thumb">
+          <video id="videoPlayer" controls crossorigin="anonymous"></video>
+        </div>
+        <div class="video-meta">
+          <div class="video-filename" id="videoFilename"></div>
+          <div class="video-stats">
+            <span id="videoDuration"></span>
+            <span id="videoSize"></span>
+            <span id="videoFormat"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="extract-controls">
+        <div class="control-row">
+          <label>导出格式</label>
+          <select id="audioFormat">
+            <option value="wav">WAV (无损)</option>
+          </select>
+        </div>
+        <button class="btn-primary" id="extractAudio">提取音频</button>
+      </div>
+
+      <div class="extract-progress" id="extractProgress" style="display:none">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <span class="progress-text" id="progressText">提取中...</span>
+      </div>
+
+      <div class="extract-result" id="extractResult" style="display:none">
+        <div class="result-audio">
+          <audio id="audioPreview" controls></audio>
+        </div>
+        <button class="btn-primary" id="downloadAudio">下载音频</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="<%= url_for('/js/tools.js') %>"></script>
