@@ -22,6 +22,10 @@
   --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   font-family: "Noto Serif SC", "Songti SC", "STSong", "SimSun", Georgia, "Times New Roman", serif;
   font-size: 16px;
@@ -30,6 +34,18 @@ body {
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Refined focus ring */
+:focus-visible {
+  outline: 2px solid var(--vermillion);
+  outline-offset: 2px;
+  border-radius: 1px;
+}
+
+/* Balanced headings */
+h1, h2, h3, h4 {
+  text-wrap: balance;
 }
 
 /* Subtle paper grain texture */
@@ -591,6 +607,18 @@ body::before {
   line-height: 1.8;
 }
 
+/* Drop cap — first letter of first paragraph */
+.post-content > p:first-of-type::first-letter {
+  float: left;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 4.2em;
+  font-weight: 900;
+  line-height: 0.85;
+  margin-right: 12px;
+  margin-top: 2px;
+  color: var(--ink);
+}
+
 .post-content blockquote {
   border-left: 2px solid var(--vermillion);
   padding: 4px 0 4px 20px;
@@ -608,6 +636,67 @@ body::before {
 
 .post-content a:hover {
   border-bottom-color: var(--vermillion);
+}
+
+/* Content images */
+.post-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+  margin: 28px 0;
+}
+
+/* Tables */
+.post-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 28px 0;
+  font-size: 14px;
+}
+
+.post-content th,
+.post-content td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-light);
+  text-align: left;
+}
+
+.post-content th {
+  font-family: "DM Mono", "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Horizontal rule */
+.post-content hr {
+  border: none;
+  height: 1px;
+  background: var(--border);
+  margin: 36px 0;
+  width: 40%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Lists */
+.post-content ul,
+.post-content ol {
+  margin: 18px 0;
+  padding-left: 22px;
+  color: var(--ink-soft);
+}
+
+.post-content li {
+  margin-bottom: 6px;
+  padding-left: 2px;
+}
+
+.post-content li::marker {
+  color: var(--ink-faint);
 }
 
 .post-tags {
