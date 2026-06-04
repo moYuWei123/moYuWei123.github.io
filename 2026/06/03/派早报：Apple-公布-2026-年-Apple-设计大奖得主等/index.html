@@ -5,6 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>派早报：Apple 公布 2026 年 Apple 设计大奖得主等 - 科技新闻聚合</title>
 <meta name="description" content="聚合国内外科技新闻，涵盖AI、编程、开源等领域">
+<meta name="author" content="moyuwei">
+<link rel="canonical" href="https://moYuWei123.github.io/2026/06/03/%E6%B4%BE%E6%97%A9%E6%8A%A5%EF%BC%9AApple-%E5%85%AC%E5%B8%83-2026-%E5%B9%B4-Apple-%E8%AE%BE%E8%AE%A1%E5%A4%A7%E5%A5%96%E5%BE%97%E4%B8%BB%E7%AD%89/">
+<!-- Open Graph -->
+<meta property="og:title" content="派早报：Apple 公布 2026 年 Apple 设计大奖得主等 - 科技新闻聚合">
+<meta property="og:description" content="聚合国内外科技新闻，涵盖AI、编程、开源等领域">
+<meta property="og:url" content="https://moYuWei123.github.io/2026/06/03/%E6%B4%BE%E6%97%A9%E6%8A%A5%EF%BC%9AApple-%E5%85%AC%E5%B8%83-2026-%E5%B9%B4-Apple-%E8%AE%BE%E8%AE%A1%E5%A4%A7%E5%A5%96%E5%BE%97%E4%B8%BB%E7%AD%89/">
+<meta property="og:site_name" content="科技新闻聚合">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="zh_CN">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="派早报：Apple 公布 2026 年 Apple 设计大奖得主等 - 科技新闻聚合">
+<meta name="twitter:description" content="聚合国内外科技新闻，涵盖AI、编程、开源等领域">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -26,11 +39,13 @@
       
         <a href="/tools">工具</a>
       
+      <button class="nav-search" id="navSearch" aria-label="搜索">搜索</button>
     </nav>
   </div>
 </header>
   <main class="container">
-    <article class="post-full">
+    <div class="reading-progress" id="readingProgress"></div>
+<article class="post-full">
   <header class="post-header">
     <h1 class="post-title">派早报：Apple 公布 2026 年 Apple 设计大奖得主等</h1>
     <div class="post-meta">
@@ -76,6 +91,17 @@
   <footer class="site-footer">
   <p>&copy; 2026-2026 科技新闻聚合</p>
 </footer>
+<div class="search-overlay" id="searchOverlay">
+  <div class="search-bg" id="searchBg"></div>
+  <div class="search-container">
+    <div class="search-input-wrap">
+      <input type="text" class="search-input" id="searchInput" placeholder="搜索…" autocomplete="off">
+      <button class="search-close" id="searchClose">&times;</button>
+    </div>
+  </div>
+  <div class="search-results" id="searchResults"></div>
+</div>
+<button class="back-to-top" id="backToTop" aria-label="Back to top">↑</button>
 <script>
 (function(){
   var path = location.pathname;
@@ -84,6 +110,145 @@
     var href = a.getAttribute('href');
     if (href === '/' && path === '/') { a.classList.add('active'); return; }
     if (href !== '/' && path.startsWith(href)) { a.classList.add('active'); }
+  });
+})();
+(function(){
+  var bar = document.getElementById('readingProgress');
+  if (!bar) return;
+  window.addEventListener('scroll', function(){
+    var h = document.documentElement;
+    var st = h.scrollTop || document.body.scrollTop;
+    var sh = h.scrollHeight - h.clientHeight;
+    bar.style.width = sh > 0 ? (st / sh * 100) + '%' : '0%';
+  }, {passive: true});
+})();
+(function(){
+  var overlay = document.getElementById('searchOverlay');
+  var input = document.getElementById('searchInput');
+  var results = document.getElementById('searchResults');
+  var searchBtn = document.getElementById('navSearch');
+  var closeBtn = document.getElementById('searchClose');
+  var bg = document.getElementById('searchBg');
+  if (!overlay || !input || !results || !searchBtn) return;
+
+  var searchData = null;
+
+  searchBtn.addEventListener('click', function(){
+    overlay.classList.add('active');
+    setTimeout(function(){ input.focus(); }, 100);
+    if (!searchData) loadSearch();
+  });
+
+  function close() { overlay.classList.remove('active'); results.innerHTML = ''; input.value = ''; }
+  closeBtn.addEventListener('click', close);
+  bg.addEventListener('click', close);
+
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && overlay.classList.contains('active')) close();
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      overlay.classList.add('active');
+      setTimeout(function(){ input.focus(); }, 100);
+      if (!searchData) loadSearch();
+    }
+  });
+
+  function loadSearch() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/search.xml', true);
+    xhr.onload = function(){
+      if (xhr.status === 200) {
+        var parser = new DOMParser();
+        var xml = parser.parseFromString(xhr.responseText, 'text/xml');
+        var entries = xml.querySelectorAll('entry');
+        searchData = [];
+        entries.forEach(function(e){
+          var url = e.querySelector('url') && e.querySelector('url').textContent || '';
+          // Skip wallpaper posts in search results
+          if (/\/bing-/.test(url) || /\/bing-wallpaper/.test(url)) return;
+          searchData.push({
+            title: e.querySelector('title') && e.querySelector('title').textContent || '',
+            url: url,
+            content: (e.querySelector('content') && e.querySelector('content').textContent || '').replace(/<[^>]+>/g, ''),
+            date: e.querySelector('date') && e.querySelector('date').textContent || ''
+          });
+        });
+      }
+    };
+    xhr.send();
+  }
+
+  var timer;
+  input.addEventListener('input', function(){
+    clearTimeout(timer);
+    var q = input.value.trim();
+    if (!q) { results.innerHTML = ''; return; }
+    if (!searchData) { results.innerHTML = '<div class="search-empty">索引加载中…</div>'; return; }
+    timer = setTimeout(function(){ doSearch(q); }, 150);
+  });
+
+  function doSearch(q) {
+    var lower = q.toLowerCase();
+    var matched = [];
+    searchData.forEach(function(item){
+      var score = 0;
+      var title = item.title || '';
+      var content = item.content || '';
+      if (title.toLowerCase().indexOf(lower) !== -1) score += 3;
+      if (content.toLowerCase().indexOf(lower) !== -1) score += 1;
+      if (score > 0) matched.push({item: item, score: score});
+    });
+    matched.sort(function(a,b){ return b.score - a.score; });
+    matched = matched.slice(0, 15);
+
+    if (!matched.length) {
+      results.innerHTML = '<div class="search-empty">无结果</div>';
+      return;
+    }
+    var html = '';
+    matched.forEach(function(m){
+      var item = m.item;
+      html += '<a class="search-result-item" href="' + item.url + '">';
+      html += '<div class="search-result-title">' + highlight(item.title, q) + '</div>';
+      html += '<div class="search-result-meta">' + (item.date ? item.date.substring(0,10) : '') + '</div>';
+      html += '</a>';
+    });
+    results.innerHTML = html;
+  }
+
+  function highlight(text, q) {
+    var re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    return text.replace(re, '<em>$1</em>');
+  }
+})();
+(function(){
+  var filterBtns = document.querySelectorAll('.filter-btn');
+  var newsItems = document.querySelectorAll('.news-item');
+  if (!filterBtns.length || !newsItems.length) return;
+  filterBtns.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      filterBtns.forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      var filter = btn.getAttribute('data-filter');
+      newsItems.forEach(function(item){
+        if (filter === 'all') {
+          item.style.display = '';
+        } else {
+          var cats = item.getAttribute('data-categories') || '';
+          item.style.display = cats.split(',').indexOf(filter) !== -1 ? '' : 'none';
+        }
+      });
+    });
+  });
+})();
+(function(){
+  var btn = document.getElementById('backToTop');
+  if (!btn) return;
+  window.addEventListener('scroll', function(){
+    btn.classList.toggle('visible', (document.documentElement.scrollTop || document.body.scrollTop) > 400);
+  }, {passive: true});
+  btn.addEventListener('click', function(){
+    window.scrollTo({top: 0, behavior: 'smooth'});
   });
 })();
 </script>

@@ -5,6 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>科技新闻聚合</title>
 <meta name="description" content="聚合国内外科技新闻，涵盖AI、编程、开源等领域">
+<meta name="author" content="moyuwei">
+<link rel="canonical" href="https://moYuWei123.github.io/page/3/index.html">
+<!-- Open Graph -->
+<meta property="og:title" content="科技新闻聚合">
+<meta property="og:description" content="聚合国内外科技新闻，涵盖AI、编程、开源等领域">
+<meta property="og:url" content="https://moYuWei123.github.io/page/3/index.html">
+<meta property="og:site_name" content="科技新闻聚合">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="zh_CN">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="科技新闻聚合">
+<meta name="twitter:description" content="聚合国内外科技新闻，涵盖AI、编程、开源等领域">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -26,6 +39,7 @@
       
         <a href="/tools">工具</a>
       
+      <button class="nav-search" id="navSearch" aria-label="搜索">搜索</button>
     </nav>
   </div>
 </header>
@@ -33,9 +47,21 @@
     <div class="news-list">
   
   
+  
+  <div class="news-filter">
+    <button class="filter-btn active" data-filter="all">全部</button>
+    
+    <button class="filter-btn" data-filter="数码">数码</button>
+    
+    <button class="filter-btn" data-filter="科技">科技</button>
+    
+  </div>
+  
+  
     
     
-    <article class="news-item">
+    
+    <article class="news-item" data-categories="数码">
       <h2 class="news-title">
         <a href="/2026/06/02/%E5%9C%A8%E8%A7%86%E9%A2%91%E6%97%B6%E4%BB%A3%EF%BC%8C%E8%AE%A4%E7%9C%9F%E6%8B%8D%E4%B8%80%E5%BC%A0%E7%85%A7%E7%89%87%EF%BC%9AOPPO-Find-X9-Ultra-%E5%BD%B1%E5%83%8F%E6%BC%AB%E8%B0%88/">在视频时代，认真拍一张照片：OPPO Find X9 Ultra 影像漫谈</a>
       </h2>
@@ -62,7 +88,8 @@
   
     
     
-    <article class="news-item">
+    
+    <article class="news-item" data-categories="数码">
       <h2 class="news-title">
         <a href="/2026/06/02/%E4%BB%8E%E6%8F%92%E4%BB%B6%E5%88%B0-AI-%E8%BE%85%E5%8A%A9%EF%BC%9AObsidian-%E5%A6%82%E4%BD%95%E6%88%90%E4%B8%BA%E6%88%91%E7%9A%84%E4%B8%BB%E5%8A%9B%E5%B7%A5%E5%85%B7/">从插件到 AI 辅助：Obsidian 如何成为我的主力工具</a>
       </h2>
@@ -89,7 +116,8 @@
   
     
     
-    <article class="news-item">
+    
+    <article class="news-item" data-categories="数码">
       <h2 class="news-title">
         <a href="/2026/06/01/%E6%B4%BE%E8%AF%84-%E8%BF%91%E6%9C%9F%E5%80%BC%E5%BE%97%E5%85%B3%E6%B3%A8%E7%9A%84-App/">派评 | 近期值得关注的 App</a>
       </h2>
@@ -122,7 +150,8 @@
     
     
     
-    <article class="news-item">
+    
+    <article class="news-item" data-categories="科技">
       <h2 class="news-title">
         <a href="/2026/05/29/%E7%A7%91%E6%8A%80%E7%88%B1%E5%A5%BD%E8%80%85%E5%91%A8%E5%88%8A%EF%BC%88%E7%AC%AC-398-%E6%9C%9F%EF%BC%89%EF%BC%9AToken-%E8%B4%B9%E7%94%A8%E9%9A%BE%E4%BB%A5%E8%B4%9F%E6%8B%85/">科技爱好者周刊（第 398 期）：Token 费用难以负担</a>
       </h2>
@@ -159,6 +188,17 @@
   <footer class="site-footer">
   <p>&copy; 2026-2026 科技新闻聚合</p>
 </footer>
+<div class="search-overlay" id="searchOverlay">
+  <div class="search-bg" id="searchBg"></div>
+  <div class="search-container">
+    <div class="search-input-wrap">
+      <input type="text" class="search-input" id="searchInput" placeholder="搜索…" autocomplete="off">
+      <button class="search-close" id="searchClose">&times;</button>
+    </div>
+  </div>
+  <div class="search-results" id="searchResults"></div>
+</div>
+<button class="back-to-top" id="backToTop" aria-label="Back to top">↑</button>
 <script>
 (function(){
   var path = location.pathname;
@@ -167,6 +207,145 @@
     var href = a.getAttribute('href');
     if (href === '/' && path === '/') { a.classList.add('active'); return; }
     if (href !== '/' && path.startsWith(href)) { a.classList.add('active'); }
+  });
+})();
+(function(){
+  var bar = document.getElementById('readingProgress');
+  if (!bar) return;
+  window.addEventListener('scroll', function(){
+    var h = document.documentElement;
+    var st = h.scrollTop || document.body.scrollTop;
+    var sh = h.scrollHeight - h.clientHeight;
+    bar.style.width = sh > 0 ? (st / sh * 100) + '%' : '0%';
+  }, {passive: true});
+})();
+(function(){
+  var overlay = document.getElementById('searchOverlay');
+  var input = document.getElementById('searchInput');
+  var results = document.getElementById('searchResults');
+  var searchBtn = document.getElementById('navSearch');
+  var closeBtn = document.getElementById('searchClose');
+  var bg = document.getElementById('searchBg');
+  if (!overlay || !input || !results || !searchBtn) return;
+
+  var searchData = null;
+
+  searchBtn.addEventListener('click', function(){
+    overlay.classList.add('active');
+    setTimeout(function(){ input.focus(); }, 100);
+    if (!searchData) loadSearch();
+  });
+
+  function close() { overlay.classList.remove('active'); results.innerHTML = ''; input.value = ''; }
+  closeBtn.addEventListener('click', close);
+  bg.addEventListener('click', close);
+
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && overlay.classList.contains('active')) close();
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      overlay.classList.add('active');
+      setTimeout(function(){ input.focus(); }, 100);
+      if (!searchData) loadSearch();
+    }
+  });
+
+  function loadSearch() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/search.xml', true);
+    xhr.onload = function(){
+      if (xhr.status === 200) {
+        var parser = new DOMParser();
+        var xml = parser.parseFromString(xhr.responseText, 'text/xml');
+        var entries = xml.querySelectorAll('entry');
+        searchData = [];
+        entries.forEach(function(e){
+          var url = e.querySelector('url') && e.querySelector('url').textContent || '';
+          // Skip wallpaper posts in search results
+          if (/\/bing-/.test(url) || /\/bing-wallpaper/.test(url)) return;
+          searchData.push({
+            title: e.querySelector('title') && e.querySelector('title').textContent || '',
+            url: url,
+            content: (e.querySelector('content') && e.querySelector('content').textContent || '').replace(/<[^>]+>/g, ''),
+            date: e.querySelector('date') && e.querySelector('date').textContent || ''
+          });
+        });
+      }
+    };
+    xhr.send();
+  }
+
+  var timer;
+  input.addEventListener('input', function(){
+    clearTimeout(timer);
+    var q = input.value.trim();
+    if (!q) { results.innerHTML = ''; return; }
+    if (!searchData) { results.innerHTML = '<div class="search-empty">索引加载中…</div>'; return; }
+    timer = setTimeout(function(){ doSearch(q); }, 150);
+  });
+
+  function doSearch(q) {
+    var lower = q.toLowerCase();
+    var matched = [];
+    searchData.forEach(function(item){
+      var score = 0;
+      var title = item.title || '';
+      var content = item.content || '';
+      if (title.toLowerCase().indexOf(lower) !== -1) score += 3;
+      if (content.toLowerCase().indexOf(lower) !== -1) score += 1;
+      if (score > 0) matched.push({item: item, score: score});
+    });
+    matched.sort(function(a,b){ return b.score - a.score; });
+    matched = matched.slice(0, 15);
+
+    if (!matched.length) {
+      results.innerHTML = '<div class="search-empty">无结果</div>';
+      return;
+    }
+    var html = '';
+    matched.forEach(function(m){
+      var item = m.item;
+      html += '<a class="search-result-item" href="' + item.url + '">';
+      html += '<div class="search-result-title">' + highlight(item.title, q) + '</div>';
+      html += '<div class="search-result-meta">' + (item.date ? item.date.substring(0,10) : '') + '</div>';
+      html += '</a>';
+    });
+    results.innerHTML = html;
+  }
+
+  function highlight(text, q) {
+    var re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    return text.replace(re, '<em>$1</em>');
+  }
+})();
+(function(){
+  var filterBtns = document.querySelectorAll('.filter-btn');
+  var newsItems = document.querySelectorAll('.news-item');
+  if (!filterBtns.length || !newsItems.length) return;
+  filterBtns.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      filterBtns.forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      var filter = btn.getAttribute('data-filter');
+      newsItems.forEach(function(item){
+        if (filter === 'all') {
+          item.style.display = '';
+        } else {
+          var cats = item.getAttribute('data-categories') || '';
+          item.style.display = cats.split(',').indexOf(filter) !== -1 ? '' : 'none';
+        }
+      });
+    });
+  });
+})();
+(function(){
+  var btn = document.getElementById('backToTop');
+  if (!btn) return;
+  window.addEventListener('scroll', function(){
+    btn.classList.toggle('visible', (document.documentElement.scrollTop || document.body.scrollTop) > 400);
+  }, {passive: true});
+  btn.addEventListener('click', function(){
+    window.scrollTo({top: 0, behavior: 'smooth'});
   });
 })();
 </script>
