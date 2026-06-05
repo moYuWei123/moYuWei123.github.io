@@ -1,0 +1,261 @@
+---
+title: "早报｜苹果App Store四成头部应用已支持AI/千问上线肯德基skill/奈雪擦边LABUBU被判赔32万"
+date: 2026-06-05 00:36:28
+categories: [数码]
+tags: ["爱范儿", "早报"]
+source_url: https://www.ifanr.com/1668169?utm_source=rss&utm_medium=rss&utm_campaign=
+source_name: 爱范儿
+---
+> 原文链接：[https://www.ifanr.com/1668169?utm_source=rss&utm_medium=rss&utm_campaign=](https://www.ifanr.com/1668169?utm_source=rss&utm_medium=rss&utm_campaign=)
+
+<div style="padding: 0 14px; text-align: center;"><img src="https://s3.ifanr.com/images/ep/cover-images/shi_nei_jian_zhu_de_wu_zhe_cover.jpg" alt="cover" /></div>
+<div style="padding: 0 14px;">
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f916.png" alt="🤖" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">腾讯客服回应微信与华为、小米等厂商合作 A2A 助手能力</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f680.png" alt="🚀" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">SpaceX 启动 IPO 路演，估值达 1.77 万亿美元</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f916.png" alt="🤖" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">OpenAI CFO：首款 AI 硬件设备今年底前正式发布，体验「很难用语言描述」</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f634.png" alt="😴" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">ChatGPT 推出全新记忆系统「做梦」</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f4f1.png" alt="📱" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">App Store 生态规模达到 1.4 万亿美元</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f47e.png" alt="👾" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">美国 AI Agent 初创公司将主力模型从 Claude 切到 DeepSeek</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f4bb.png" alt="💻" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">字节 AI 今年押注世界模型、Coding 和豆包商业化</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f310.png" alt="🌐" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">联合国大学报告：AI 扩张正在推高能源、水资源压力</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f4cb.png" alt="📋" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">中国信通院将启动高质量 Token 服务能力计划</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f4b0.png" alt="💰" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">Suno 完成 4 亿美元 D 轮融资</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/2601.png" alt="☁" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">Google 资助虚拟电厂支持数据中心用电</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f4a1.png" alt="💡" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">台积电 CEO：AI 需求缺口将持续数年，员工奖金平均涨幅超 30%</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/231a.png" alt="⌚" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">三星健康「史诗级升级」，Galaxy Watch9 新功能曝光</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f4b0.png" alt="💰" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">Meta Agent 产品曝光，订阅价格最高每月 199.99 美元对标 GPT Pro</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f5a8.png" alt="🖨" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">罗技 MX Master 4 适配 Windows 11 触觉反馈</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f3a8.png" alt="🎨" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">Ideogram 发布 9.3B 开源权重图像模型</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f399.png" alt="🎙" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">Miso Labs 开源 8B 语音模型 MisoTTS</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f4f1.png" alt="📱" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">千问新增肯德基 skill，支持到店自取</p>
+</div>
+</div>
+<div>
+<p style="float: left; margin-right: 6px; margin-bottom: 0; width: 30px;"><img src="https://s.w.org/images/core/emoji/11/72x72/1f9f8.png" alt="🧸" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="margin-bottom: 0; width: 88%;">
+<p style="margin-bottom: 0;">泡泡玛特告奈雪的茶获赔 32 万</p>
+</div>
+</div>
+</div>
+<section><img src="https://s3.ifanr.com/images/ep/common-images/xin_wen.png" alt="重磅" /></section>
+<h3>腾讯客服回应微信与华为、小米等厂商合作 A2A 助手能力</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/5a91e8bb-ba7e-4790-8ed7-620c7f691863.jpg" alt="" /></p>
+<p>昨天，腾讯客服回应称，微信正在与华为、荣耀、小米、OPPO、vivo 等手机厂商合作推出 A2A (Agent-to-Agent) 助手能力，用户可以通过对应手机系统的 AI 助手发起微信音视频通话，或向指定好友发送微信消息。</p>
+<p>目前，荣耀部分机型已支持该功能。用户把 YOYO 智能体和微信更新到最新版本后，可以通过语音下达发送微信消息、拨打微信语音或视频通话等指令。</p>
+<p>腾讯客服称，该功能基于 A2A 协作机制，并通过双重授权机制处理数据安全与隐私。</p>
+<section><img src="https://s3.ifanr.com/images/ep/common-images/da_gong_si.png" alt="大公司" /></section>
+<h3>SpaceX 启动 IPO 路演，估值达 1.77 万亿美元</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/dcbc15fe-8207-444b-87ec-d8d7f0c3f85e.png" alt="" /></p>
+<p>据路透社、CNBC 报道，SpaceX 于北京时间 6 月 4 日正式启动 IPO 路演。此前，公司向 SEC 提交修订版招股书，将发行价锁定为每股 135 美元，拟发行 5.556 亿股 A 类普通股，融资规模约 750 亿美元，对应整体估值约 1.77 万亿美元。</p>
+<p>招股书显示，上市后马斯克的投票控制权将超过 82%、所持 SpaceX 股权账面估值达 8665 亿美元；若叠加其特斯拉持股与期权，他的个人财富规模将接近万亿美元级别。</p>
+<p>按计划，SpaceX 将于 6 月 11 日完成定价，6 月 12 日以「SPCX」为代码在纳斯达克挂牌，融资规模将超过此前沙特阿美创下的 290 亿美元 IPO 纪录逾两倍。</p>
+<h3>OpenAI CFO：首款 AI 硬件设备今年底前正式发布，体验「很难用语言描述」</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/79e5b1e0-1c57-441d-a46b-3d4cd3505d14.png" alt="" /></p>
+<p>OpenAI CFO Sarah Friar 近日在接受采访时透露，她已亲自体验过 OpenAI 正在开发的 AI 硬件设备，并称使用体验「很难用语言描述」。Friar 表示，这款产品计划在「今年年底之前」正式发布。</p>
+<p>这与此前消息披露的时间点有所提前。此前，OpenAI 曾在一份内部文件中预计，最早要到明年 2 月才会开始发货。</p>
+<p>据此前多家媒体报道，OpenAI 正在开发的产品线涵盖无屏幕小型设备、智能眼镜等多种形态，其中一款代号「Gumdrop」的笔形设备被描述为继 MacBook 和 iPhone 之后的「第三大核心设备」，目标发布时间为今年底至明年初。</p>
+<p>Friar 还谈及 IPO 计划，表示上市「目前不在议程上」，公司当前重心是扩大规模。她同时披露，OpenAI 今年的年化收入已超过 200 亿美元，相较于去年的 60 亿美元大幅增长。</p>
+<h3>ChatGPT 推出全新记忆系统「做梦」</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/20260605_%E6%97%A9%E6%8A%A5/302323cd-2af3-4395-add7-cf34929b6911.jpg" alt="" /></p>
+<p>OpenAI 正式推出 ChatGPT 记忆系统的重大升级，推出名为「Dreaming」（做梦）的新架构。</p>
+<p>新版 Dreaming 架构的核心变化在于引入后台持续运行的自动化流程，系统会跨多轮对话综合提炼用户信息，并随时间推移主动更新记忆状态。</p>
+<p>以旅行场景为例，「用户计划于 7 月前往新加坡」这条记忆，会在行程结束后自动更新为「用户曾于 2026 年 7 月前往新加坡」，而非继续以过期信息影响后续对话。</p>
+<p>OpenAI 公布了三项评测指标，对比 2024 年（纯存储记忆）、2025 年（存储记忆 + 早期 Dreaming）与 2026 年（Dreaming V3）三个阶段的表现：</p>
+<blockquote><p>事实记忆准确率从 41.5% 提升至 82.8%；偏好遵循率从 31.4% 提升至 71.3%；时效性准确率从 9.4% 提升至 75.1%。</p></blockquote>
+<p>值得一提的是，Anthropic 于今年 5 月 6 日的 Code with Claude 开发者大会上发布了同名的「Dreaming」功能，比 OpenAI 此次发布早约一个月。</p>
+<h3>App Store 生态规模达到 1.4 万亿美元</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/9e169cc6-bc77-4227-ae9b-2285d42f8df9.gif" alt="" /></p>
+<p>苹果昨日宣布，安诺析思国际咨询经济学家的新研究显示，2025 年全球 App Store 生态系统促成逾 1.4 万亿美元开发者营业额与销售额。苹果强调，<strong>这些营业额和销售额中超过 90% 完全归开发者所有，无需向苹果支付佣金</strong>。</p>
+<ul>
+<li>实体商品和服务销售额约 1.1 万亿美元，主要来自日用百货、餐饮外卖与自取、一般零售和旅游；</li>
+<li>数字商品与服务约 1490 亿美元，主要来自游戏、企业 App 和视频流媒体；</li>
+<li>App 内展示广告收入约 1510 亿美元。</li>
+</ul>
+<p>苹果还把 AI 写进本次报告。2025 年 App Store 排名前 100 的 App 中，超过 40 款具备面向消费者的 AI 功能，这些 App 的营业额增长高于前 100 名中的其他 App。App Store 目前覆盖 175 个国家和地区，平均每周访问量超过 8.5 亿次。</p>
+<h3>美国 AI Agent 初创公司将主力模型从 Claude 切到 DeepSeek</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/0e59237c-1985-4567-8792-7a39f2baac0b.png" alt="" /></p>
+<p>昨天，美国 AI Agent 初创公司 Lindy 创始人兼 CEO Flo Crivello 在 X 上发文称，公司已经把 100% 的 Lindy 流量切换到 DeepSeek V4，并停用 Anthropic 的 Claude 模型。</p>
+<p>Crivello 称，这次切换每年可为公司节省数百万美元，并且在多个核心使用场景中看到性能提升。他同时表示仍看好 Anthropic 的企业客户关系、开发者品牌、模型迭代和算力扩张，但认为中国模型正在快速追赶。</p>
+<p>这次迁移主要发生在高频调用模型的 Agent 产品链路。Crivello 还提到，团队为完成切换建设了大量基础设施和内部工具，实际工作量比最初预想高出 100 倍，之后会发布工程博客复盘。</p>
+<h3>字节 AI 今年押注世界模型、Coding 和豆包商业化</h3>
+<p>据《智能涌现》消息，2026 年字节 AI 有四个关键命题：加大世界模型训练投入，保持视频模型领先，补强 Coding 数据工程与 Agent 能力，并推动豆包商业化。</p>
+<p>世界模型是其中最明确的研究目标。文章称，吴永辉已在 Seed 全员会上设定目标，要求 2026 年底前至少发布一版世界模型，性能对标 Google Genie 3。</p>
+<p>Coding 方向的核心问题则是数据回流。一名知情者称，字节 Coding 效果难以突破的原因在于缺少真实业务反馈；今年以来，多个应用部门开始被要求使用 Seed 模型。豆包商业化方面，文章提到豆包预计 6 月下旬上线付费内容，PPT 生成是建立付费心智的核心切入点，后续还计划推出企业版，并把海外版 Dola 的 2026 年目标设为 3000 万 DAU。</p>
+<h3>联合国大学报告：AI 扩张正在推高能源、水资源压力</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/15ecec6d-8e70-4152-99be-14838327e490.png" alt="" /></p>
+<p>联合国大学昨日发布水、环境与健康研究所报告，称人工智能基础设施快速扩张正在显著增加能源、水资源和土地需求。</p>
+<p>报告估计，2025 年全球数据中心耗电量达到 448 太瓦时；到 2030 年，数据中心电力需求可能增至 945 太瓦时（1 太瓦时 = 10 亿度电），约占全球电力消费总量的 3%。</p>
+<p>报告把「推理」列为主要能耗来源。研究显示，推理环节占人工智能总能耗的 80% 至 90%；ChatGPT 每天处理的提示请求估计约 25 亿次，对应年耗电量约 383 吉瓦时。</p>
+<p>不同 AI 任务能耗差异也很大：生成一张 AI 图像的能耗约为基础文本分类任务的 1450 倍，生成一段短视频则相当于 20 万次垃圾邮件分类任务。</p>
+<p>报告预测，到 2030 年全球数据中心的相关用水量（含直接冷却与间接发电/制造用水）将达到 9.3 万亿升，相当于撒哈拉以南非洲 13 亿人一年的基本生活用水需求。</p>
+<p>报告还提到，目前全球仅 32 个国家拥有专门的 AI 数据中心，超过 90% 的 AI 专用云计算资源集中在美国和中国两国。</p>
+<h3>中国信通院将启动高质量 Token 服务能力计划</h3>
+<p>据财联社报道，中国信息通信研究院人工智能研究所、人工智能大模型与软硬件评测工业和信息化部重点实验室、中国人工智能产业发展联盟模型服务工作组将于 6 月 16 日在北京召开「高质量 Token 服务研讨会」。</p>
+<p>会议将成立「高质量 Token 服务特别研究组」，并启动「高质量 Token 服务能力攀登计划」。按公开信息，这一计划面向大模型服务中的 Token 供给质量、性能测评和产业规范化建设，目标是从组织机制和能力提升两方面推动模型服务产业发展。</p>
+<h3>Suno 完成 4 亿美元 D 轮融资</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/ae6b643d-562a-411b-be24-7fbea2300b15.png" alt="" /></p>
+<p>当地时间周三，AI 音乐生成公司 Suno 宣布完成 4 亿美元 D 轮融资，投后估值达 54 亿美元。距离其上一轮融资、估值 24.5 亿美元仅过去约七个月。Billboard 此前拿到的融资材料显示，Suno 用户日均生成 AI 歌曲超过 700 万首。</p>
+<p>Suno 的估值上涨发生在多起版权诉讼仍在推进之时。公司承认其 AI 模型依托受版权保护歌曲训练，并主张相关使用符合合理使用原则。</p>
+<p>环球音乐集团、索尼音乐和德国著作权集体管理组织 GEMA 等版权方持续起诉 Suno；华纳音乐集团则已于去年 11 月与 Suno 达成和解并签订版权授权协议。</p>
+<h3>Google 资助虚拟电厂支持数据中心用电</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/a83fc25a-3ad5-45d7-9d98-164d0fa13e5d.png" alt="" /></p>
+<p>据《MIT 科技评论》报道，Google 与虚拟电厂平台 Voltus 达成新协议，将在美国最大电网区域建设虚拟电厂，为数据中心用电提供调峰能力。</p>
+<p>Voltus 将把电动车、智能恒温器等分布式设备聚合起来，在电网压力较大时降低用电或释放储能，并向参与用户支付报酬。Google 将承担项目建设成本，项目释放出的额外电力容量会用于支持该地区数据中心运行。</p>
+<p>这类方案的背景是 AI 数据中心需求快速上升，而输电和新建电源审批周期较长。杜克大学去年一项研究曾提出，如果数据中心每年在约 40 小时高峰时段降低用电，美国电网可在不新增大量电厂和输电设施的情况下接入约 100GW 数据中心负载。</p>
+<h3><img src="https://s.w.org/images/core/emoji/11/72x72/1f4a1.png" alt="💡" class="wp-smiley" style="height: 1em; max-height: 1em;" /> 台积电 CEO：AI 需求缺口将持续数年，员工奖金平均涨幅超 30%</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/ac9f7648-fea0-492e-b31a-936e45e2d9a5.png" alt="" /></p>
+<p>据彭博社报道，台积电 CEO 魏哲家昨日在年度股东大会上表示，全球芯片供应在未来数年内仍将无法满足 AI 带动的需求增长，公司距离供需平衡「还需要很长时间」。</p>
+<p>在需求侧，魏哲家指出，AI 应用正从生成式 AI 的查询模式进一步演进至 Agentic AI 与指令行动模式，这一转变持续推升大型语言模型处理文本所需的 token 消耗量，进而带动运算能力需求持续增长。</p>
+<p>他表示，在技术差异化与广泛客户群支持下，公司维持强劲信心，若以美元计算，预计今年全年营收成长仍将超过 30%；台积电员工今年的平均奖金将增长 30% 以上。</p>
+<section><img src="https://s3.ifanr.com/images/ep/common-images/hao_chan_pin.png" alt="新产品" /></section>
+<h3>三星健康「史诗级升级」，Galaxy Watch9 新功能曝光</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/25ce1b3a-a6d8-4393-b336-448a9dd0acb3.png" alt="" /></p>
+<p>三星昨日发布 Samsung 健康 App 的重大更新，面向下一代 Galaxy Watch 引入多项 AI 健康功能。新功能首发适配新一代 Galaxy Watch，支持 Android 10 及以上安卓机型。这次更新包括四类核心健康监测能力：</p>
+<ul>
+<li>Vitals 生命体征：晨起自动分析夜间心率、心率变异性、呼吸频率、皮温和血氧，并与个人静息基准值对比；</li>
+<li>Heart Health Score 心脏健康评分：整合睡眠、压力、运动和身体成分数据，生成每日综合分数；</li>
+<li>Daily Cardio Load 每日心肺负荷：估算有氧运动带来的心血管负荷，用于推荐训练和休息节奏；</li>
+<li>Fitness Index 体能指数：结合心率、最大摄氧量和步数，对照同龄群体数据给出体能评估。</li>
+</ul>
+<p>三星还会调整首页信息架构，把睡眠、活动、营养、心理和生命体征放入同一视图，并新增听力健康功能，通过 Galaxy Watch 监测环境噪音和噪音暴露风险。</p>
+<h3>Meta Agent 产品曝光，订阅价格最高每月 199.99 美元对标 GPT Pro</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/5a9d99a8-be28-4652-af9e-24e21afa422a.png" alt="" /></p>
+<p>据《The Information》报道，Meta 正考虑为其计划中的 AI 智能体产品「Hatch」设置最高每月 199.99 美元的订阅价格，与 OpenAI ChatGPT Pro 及 Anthropic Claude Max 最高档持平。</p>
+<p>Hatch 是 Meta 开源工具 OpenClaw 的消费者版本，支持通过自然语言指令完成编写软件工具、管理日历、代发邮件等任务。</p>
+<p>定价上，Meta 计划提供免费版与付费的「Hatch Plus」两个层级，后者每日使用配额为免费版的 5 至 10 倍，token 用量按计费周期重置、不可结转。</p>
+<p>产品目前由 Anthropic 的 Claude Opus 4.6 和 Claude Sonnet 4.6 驱动，正式上线后将切换为 Meta 自研模型 Muse Spark。</p>
+<p>在发布计划上，Meta 原定今年 4 月在美国推出，后调整为先向约 10 家企业小规模试点，计划于 7 月完成品牌命名并扩大发布范围，具体时间仍可能变动。</p>
+<h3>罗技 MX Master 4 适配 Windows 11 触觉反馈</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/6fca3a9e-e8dc-4895-8c25-e36ad44f5489.jpg" alt="" /></p>
+<p>罗技 MX Master 4 无线鼠标已经原生适配 Windows 11 高级触觉反馈功能，用户在 PPT 素材对齐、窗口磁吸和调整大小等操作中，可以通过鼠标震动获得物理反馈。</p>
+<p>开启该能力需要将 Windows 11 更新到 2026 年 3 月底及之后推送的版本，并通过 Logi Options+ 把 MX Master 4 固件升级至 27.3.19 或以上。</p>
+<p>此外，Pixso 与 WPS Office 已上线罗技 Actions Ring 插件市场。罗技还把 AI PPT 接入 AI Portal 智能调度台，让用户在罗技生态内直接调用演示文稿生成能力。</p>
+<h3>Ideogram 发布 9.3B 开源权重图像模型</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/dfa1a51f-6493-4c94-a038-f491cff7f156.png" alt="" /></p>
+<p>AI 图像生成平台 Ideogram 发布首个开源权重图像基础模型 Ideogram 4.0。该模型参数规模为 9.3B，重点面向文字渲染、版式设计和可控图像生成。</p>
+<p>模型目前开放两个精度版本：nf4 版本支持 CUDA 与 Diffusers，可在单张 24GB 显存的 GPU 上运行；fp8 版本则支持全硬件运行。</p>
+<p>在基准测试方面，该模型在衡量布局控制能力的 7Bench 测试中取得 0.69 mIoU，在 X-Omni 英文 OCR 测试中准确率达 0.97。在设计偏好 ELO 盲测中，Ideogram 4.0 在开源模型中排名第一，综合表现优于 FLUX.2 [dev] 和 Nano Banana 2。</p>
+<p><img src="https://s.w.org/images/core/emoji/11/72x72/1f4bb.png" alt="💻" class="wp-smiley" style="height: 1em; max-height: 1em;" /> GitHub: github.com/ideogram-oss/ideogram4</p>
+<p><img src="https://s.w.org/images/core/emoji/11/72x72/1f917.png" alt="🤗" class="wp-smiley" style="height: 1em; max-height: 1em;" /> Hugging Face: huggingface.co/collections/ideogram-ai/ideogram-4</p>
+<h3>Miso Labs 开源 8B 语音模型 MisoTTS</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/77103815-42cf-49b8-96ab-a31f2781ab8d.png" alt="" /></p>
+<p>Miso Labs 昨日发布并开源文本到对话语音生成模型 MisoTTS，又称 Miso One。官方博客称，该模型规模为 80 亿参数，面向情感表达更自然、响应延迟更低的语音代理场景。</p>
+<p>MisoTTS 使用残差矢量量化架构，把每个音频 token 表示为 32 个 codebook 索引，每个 codebook 为 2048 维，从而避免传统 Transformer 直接扩展单一音频词表时遇到的参数膨胀。</p>
+<p>官方称，这种设计让模型能利用前序音频或对话历史生成更贴合语气的回复，并支持提示式声音生成。</p>
+<section><img src="https://s3.ifanr.com/images/ep/common-images/pin_pai.png" alt="新消费" /></section>
+<h3>千问新增肯德基 skill，支持到店自取</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/029f4058-2496-48db-ba69-7805354fc644.png" alt="" /></p>
+<p>昨天，千问 App 官宣，肯德基已以第三方 Skill 形式接入千问。用户可以对千问说「帮我点附近肯德基的疯狂星期四，到店取」，千问会寻找附近门店、匹配套餐，并展示门店距离和预计取餐时间。</p>
+<p>具体功能上，千问可接收用户下单指令，使用支付宝付款，并在下单后展示取餐号、订单详情和步行导航。千问还与肯德基会员权益打通，下单时可自动使用大神卡和餐品匹配优惠券。</p>
+<h3>泡泡玛特告奈雪的茶获赔 32 万</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/bdefd17a-209e-44d3-8cf2-aff79a3f280d.png" alt="" /></p>
+<p>据北京日报报道，北京市朝阳区人民法院近日就泡泡玛特诉奈雪的茶不正当竞争纠纷案作出一审判决，认定奈雪的茶所属公司构成不正当竞争，判令其赔偿泡泡玛特经济损失 30 万元及维权合理开支 2 万元，判决现已生效。</p>
+<p>案件起因于 2025 年 9 月。奈雪的茶当时在门店、微信公众号和小程序推出主题营销活动，将多款茶饮命名为「米布布」，宣传图文使用「LABUBU」美术形象，并打出「喝米布布抽 LABUBU」「MIBUBU 带上布布免费喝布布」等宣传语。</p>
+<p>泡泡玛特认为，奈雪的茶未经许可使用与「LABUBU」相同或近似的标识进行商业推广，容易使公众误认为双方存在商业合作关系。</p>
+<h3>油价下调，加满一箱油少花 20 元</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/53e23763-a6ba-41c4-8f04-b2ab600410cc.png" alt="" /></p>
+<p>央视新闻从国家发展改革委了解到，昨日 24 时起，国内汽、柴油价格每吨分别下调 525 元和 505 元。</p>
+<p>按全国平均价格折算，92 号汽油、95 号汽油和 0 号柴油每升分别下调 0.41 元、0.44 元和 0.43 元。以 50 升油箱计算，加满 92 号汽油将少花 20.5 元；以月跑 10000 公里、百公里油耗 38L 的重型卡车测算，未来半个月单辆车燃油成本约减少 763 元。</p>
+<section><img src="https://s3.ifanr.com/images/ep/common-images/hao_kan_de.png" alt="好看的" /></section>
+<h3>周星驰入股互动之星，合作 AI 剧集和互动影游</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/95e56008-7075-4dc0-a3ec-a889121cd3cd.jpg" alt="" /></p>
+<p>江苏省苏州市相城区区委政府「今日相城」日前官宣，周星驰携旗下比高集团完成对苏州互动之星网络科技有限公司的战略入股。双方将围绕 AI 剧集、互动影游、真人影视和 IP 全产业链运营展开合作。</p>
+<p>互动之星 2024 年 4 月落户相城，业务聚焦 AI 剧集与互动影游，手握 20 余部顶级 IP 全版权、百余部知名 IP 版权，覆盖《凡人修仙传》《绍宋》《悟空传》《捞尸人》《夜无疆》《回到明朝当王爷》《无限世界》等作品。</p>
+<p>现代快报采访中，互动之星创始人陈旻称，公司不会靠刻意的喜剧元素博眼球，而会用故事质感打动观众。近期项目包括依托《绍宋》改编的同名互动影游，计划暑期上线；多部网文 IP 改编横屏 AI 剧集已在制作中，短期内陆续上线。</p>
+<h3>安雅·泰勒-乔伊新剧《Lucky》发布预告，7 月 15 日登陆 Apple TV</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/92e8bbef-39a5-4680-88e2-ddfcbf9120f5.png" alt="" /></p>
+<p>据「新浪电影」消息，安雅·泰勒-乔伊主演的新剧《Lucky》正式发布预告片及海报，该剧将于 7 月 15 日在 Apple TV 开播。</p>
+<p>《Lucky》改编自玛丽莎·斯塔普利所著同名畅销小说，讲述一名年轻女子 Lucky 多年前曾有犯罪经历，在将这段过去抛之脑后之后，如今不得不最后一次直面自己内心黑暗的一面，以求彻底摆脱过去的纠缠。</p>
+<h3>《坠落2》定档 9 月 2 日北美上映</h3>
+<p><img src="https://s3.ifanr.com/images/ep/uploads/lark2pad_upload/31afb016-6fd6-444f-881d-49ffcd80d53c.png" alt="" /></p>
+<p>豆瓣电影消息，惊悚片《坠落2》发布定档海报，将于 9 月 2 日在北美上映。该片延续 2022 年惊悚片《坠落》的高空求生设定，但导演与主创阵容有所调整。</p>
+<p>公开信息显示，《坠落》导演乔纳森·弗兰克、斯科特·曼担任《坠落2》编剧，《前目的地》导演迈克尔·斯派瑞、彼得·斯派瑞执导，恐怖片《痴迷》制片人参与制作。</p>
+<p>#欢迎关注爱范儿官方微信公众号：爱范儿（微信号：ifanr），更多精彩内容第一时间为您奉上。</p>

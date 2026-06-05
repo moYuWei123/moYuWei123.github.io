@@ -12,7 +12,7 @@ const postsDir = path.join(__dirname, 'source', '_posts');
 
 function slugify(text) {
   return text
-    .replace(/[<>:"/\\|?*]/g, '')
+    .replace(/[<>:"/\\|?*%]/g, '')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .substring(0, 80);

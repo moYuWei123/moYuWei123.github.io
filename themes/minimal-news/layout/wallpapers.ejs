@@ -1,58 +1,48 @@
 <%
-var wallpaperPosts = [];
+// Load wallpaper data — Bing from posts, Pexels from JSON
+var wallpaperImages = [];
+
+// Bing wallpapers from posts with 壁纸 tag
 site.posts.forEach(function(post) {
-  var tagNames = [];
   if (post.tags) {
-    post.tags.forEach(function(tag) {
-      tagNames.push(tag.name);
-      if (tag.name === '壁纸') wallpaperPosts.push(post);
-    });
+    var isBing = false;
+    post.tags.forEach(function(t) { if (t.name === '壁纸') isBing = true; });
+    if (!isBing) return;
+    // Only take bing posts (not pexels)
+    if (post.source_name !== 'Bing') return;
+    var imgRegex = /<img[^>]+src="([^"]+)"/g;
+    var match, content = post.content;
+    while ((match = imgRegex.exec(content)) !== null) {
+      wallpaperImages.push({
+        title: post.title,
+        url: match[1],
+        source: 'Bing',
+        date: post.date ? post.date.format('YYYY-MM-DD') : ''
+      });
+    }
   }
 });
+
+// Pexels wallpapers from Hexo data (source/_data/wallpapers.json)
+if (site.data && site.data.wallpapers && site.data.wallpapers.length) {
+  site.data.wallpapers.forEach(function(item) {
+    wallpaperImages.push({
+      title: item.title || item.photographer + ' photo',
+      url: item.url,
+      source: 'Pexels',
+      photographer: item.photographer,
+      photographer_url: item.photographer_url
+    });
+  });
+}
 %>
 
 <div class="wallpapers-page">
   <h1 class="page-title">壁纸</h1>
-  <p class="page-subtitle">高清壁纸精选，点击预览大图，右键或点击下载按钮保存</p>
+  <p class="page-subtitle">高清壁纸精选 · 共 <span id="wallpaperTotal"><%= wallpaperImages.length %></span> 张</p>
 
-  <% if (!wallpaperPosts || wallpaperPosts.length === 0) { %>
-    <div class="wallpapers-empty">
-      <p>暂无壁纸内容</p>
-    </div>
-  <% } %>
-
-  <div class="wallpaper-grid">
-    <% wallpaperPosts.forEach(function(post) { %>
-      <%
-        // Extract images from post content
-        var images = [];
-        var imgRegex = /<img[^>]+src="([^"]+)"/g;
-        var match;
-        var content = post.content;
-        while ((match = imgRegex.exec(content)) !== null) {
-          images.push(match[1]);
-        }
-      %>
-
-      <% images.forEach(function(img, i) { %>
-        <div class="wallpaper-card"
-             data-src="<%= img %>"
-             data-title="<%= post.title %>"
-             data-post="<%= url_for(post.path) %>"
-             data-index="<%= i %>">
-          <div class="wallpaper-img-wrap">
-            <img src="<%= img %>" alt="<%= post.title %>" loading="lazy">
-            <div class="wallpaper-overlay">
-              <div class="wallpaper-overlay-inner">
-                <span class="wallpaper-cat"><%= post.categories.first() ? post.categories.first().name : '' %></span>
-                <span class="wallpaper-name"><%= post.title %></span>
-              </div>
-            </div>
-          </div>
-        </div>
-      <% }) %>
-    <% }); %>
-  </div>
+  <div class="wallpaper-grid" id="wallpaperGrid"></div>
+  <div class="wallpaper-pagination" id="wallpaperPagination"></div>
 </div>
 
 <!-- Lightbox -->
@@ -72,4 +62,7 @@ site.posts.forEach(function(post) {
   </div>
 </div>
 
+<script>
+window.__WALLPAPERS__ = <%- JSON.stringify(wallpaperImages) %>;
+</script>
 <script src="<%= url_for('/js/wallpapers.js') %>"></script>
